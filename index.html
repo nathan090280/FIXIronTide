@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta id="viewportMeta" name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=3.0, user-scalable=yes" />
+  <title>Battleship - Iron Tide</title>
+  <link rel="stylesheet" href="style.css?v=2" />
+</head>
+<body>
+  <div style="position:relative; width:100%; height:100%;">
+    <canvas id="gameCanvas"></canvas>
+    <canvas id="shipsOverlay" style="position:absolute; left:0; top:0; pointer-events:none; z-index:5;"></canvas>
+  </div>
+  
+  <!-- Floating Debug Panel (top-left near zoom slider) -->
+  <div id="debugPanel" class="debug-panel">
+    <details id="speedDebug" class="speed-debug" open>
+      <summary>Debug</summary>
+      <div class="speed-debug-body">
+        <details class="speed-debug-section">
+          <summary>Damage Controls</summary>
+          <div class="speed-debug-section-body">
+            <div class="dbg-row">
+              <label for="dbgDamageTarget" class="dbg-label">Target</label>
+              <select id="dbgDamageTarget">
+                <option value="player" selected>Player</option>
+                <option value="npc1">NPC 1</option>
+              </select>
+            </div>
+            <div id="dbgDamageContainer" class="dbg-damage-container"></div>
+          </div>
+        </details>
+        <details class="speed-debug-section" open>
+          <summary>Range Circle</summary>
+          <div class="speed-debug-section-body">
+            <label for="dbgRange" class="dbg-label">Max Range Scale</label>
+            <input type="range" id="dbgRange" min="0.5" max="2" step="0.05" value="1" />
+            <span id="dbgRangeVal" class="dbg-value">1.00x</span>
+          </div>
+        </details>
+        <details class="speed-debug-section">
+          <summary>Place Ship</summary>
+          <div class="speed-debug-section-body">
+            <div class="dbg-row">
+              <label for="dbgPlaceType" class="dbg-label">Ship</label>
+              <select id="dbgPlaceType">
+                <option value="bismarck" selected>Bismarck</option>
+                <option value="transport">Transport</option>
+                <option value="prinzeugen">Prinz Eugen</option>
+              </select>
+              <span class="dbg-value"></span>
+            </div>
+            <div class="dbg-row">
+              <label for="dbgPlaceHeading" class="dbg-label">Heading</label>
+              <input id="dbgPlaceHeading" type="number" min="0" max="359" step="1" value="0" />
+              <span class="dbg-value">deg</span>
+            </div>
+            <div class="dbg-row">
+              <label for="dbgPlaceSpeed" class="dbg-label">Speed</label>
+              <input id="dbgPlaceSpeed" type="number" min="0" max="30" step="1" value="0" />
+              <span class="dbg-value">kts</span>
+            </div>
+            <div class="dbg-row">
+              <label for="dbgPlaceSide" class="dbg-label">Side</label>
+              <select id="dbgPlaceSide">
+                <option value="enemy">Enemy</option>
+                <option value="friendly" selected>Friendly</option>
+              </select>
+              <span class="dbg-value"></span>
+            </div>
+            <div class="dbg-row">
+              <label for="dbgPlaceDespawn" class="dbg-label">Despawn</label>
+              <input id="dbgPlaceDespawn" type="number" min="0" max="7200" step="1" value="6000" />
+              <span class="dbg-value">sec</span>
+            </div>
+            <div class="dbg-row" style="grid-template-columns: 1fr;">
+              <button id="dbgPlaceBtn" type="button" class="opt-btn">Place</button>
+            </div>
+          </div>
+        </details>
+      </div>
+    </details>
+  </div>
+
+  <!-- WWII Naval Game Control Dock (compact) -->
+  <div id="navalDock" class="dock naval-theme">
+    <div class="dock-panel">
+      <div class="dock-row row-1">
+        <div class="group">
+          <button class="fleet-btn" data-fleet="1" aria-pressed="false">Fleet 1</button>
+          <button class="gunnery-info-btn fleet-manage" data-fleet="1" aria-label="Manage Fleet 1" title="Manage Fleet 1">i</button>
+          <button class="fleet-btn" data-fleet="2" aria-pressed="false">Fleet 2</button>
+          <button class="gunnery-info-btn fleet-manage" data-fleet="2" aria-label="Manage Fleet 2" title="Manage Fleet 2">i</button>
+          <button class="fleet-btn" data-fleet="3" aria-pressed="false">Fleet 3</button>
+          <button class="gunnery-info-btn fleet-manage" data-fleet="3" aria-label="Manage Fleet 3" title="Manage Fleet 3">i</button>
+          <button class="tactical-map-btn">Map</button>
+        </div>
+        <div class="group gunnery-header" id="fleet1GunneryHeader">
+          <button class="fleet-btn gunnery-title-btn" data-fleet="1">Fleet 1 Gunnery</button>
+          <button class="gunnery-arrow left" data-fleet="1" aria-label="Previous" title="Previous">◄</button>
+          <button class="gunnery-arrow right" data-fleet="1" aria-label="Next" title="Next">►</button>
+          <button class="gunnery-info-btn" aria-label="Show target info" title="Target Info" aria-pressed="false">i</button>
+          <button class="gunnery-view-btn" aria-label="Follow target view" title="Follow Target" aria-pressed="false">👁</button>
+        </div>
+        <div class="group gunnery-header" id="fleet2GunneryHeader" style="display:none;">
+          <button class="fleet-btn gunnery-title-btn" data-fleet="2">Fleet 2 Gunnery</button>
+          <button class="gunnery-arrow left" data-fleet="2" aria-label="Previous" title="Previous">◄</button>
+          <button class="gunnery-arrow right" data-fleet="2" aria-label="Next" title="Next">►</button>
+          <button class="gunnery-info-btn" aria-label="Show target info" title="Target Info" aria-pressed="false">i</button>
+          <button class="gunnery-view-btn" aria-label="Follow target view" title="Follow Target" aria-pressed="false">👁</button>
+        </div>
+        <div class="group gunnery-header" id="fleet3GunneryHeader" style="display:none;">
+          <button class="fleet-btn gunnery-title-btn" data-fleet="3">Fleet 3 Gunnery</button>
+          <button class="gunnery-arrow left" data-fleet="3" aria-label="Previous" title="Previous">◄</button>
+          <button class="gunnery-arrow right" data-fleet="3" aria-label="Next" title="Next">►</button>
+          <button class="gunnery-info-btn" aria-label="Show target info" title="Target Info" aria-pressed="false">i</button>
+          <button class="gunnery-view-btn" aria-label="Follow target view" title="Follow Target" aria-pressed="false">👁</button>
+        </div>
+      </div>
+      <div class="dock-row row-2">
+        <div class="group movement-area">
+          <div class="speed-slider-container">
+            <div class="speed-label">Speed</div>
+            <div class="speed-slider-wrap">
+              <input type="range" id="speedSlider" class="speed-slider-rotated" min="-8" max="30" value="0">
+              <div id="speedActualIndicator" class="speed-actual-indicator" aria-hidden="true"></div>
+            </div>
+            <div class="speed-readout">0 kts</div>
+          </div>
+          
+          <div class="compass-widget" id="fleetCompass" data-type="fleet">
+            <div class="dial">
+              <div class="ticks"></div>
+              <div class="needle planned"></div>
+              <div class="needle actual"></div>
+              <div class="label">Heading</div>
+            </div>
+          </div>
+          <div class="selectors stack">
+            <div class="stack-item">
+              <label class="formation-label" for="formationSelect">Formation</label>
+              <select id="formationSelect" class="formation-select" title="Formation">
+                <option>Line Ahead</option>
+                <option>Echelon</option>
+                <option>Wedge</option>
+                <option>Circular Escort</option>
+                <option>Screen</option>
+                <option>Double Line Ahead</option>
+              </select>
+              <!-- Formation Options (floating window) -->
+              <div id="formationOptions" class="pattern-options pattern-window" aria-hidden="true" role="dialog" aria-label="Formation Options">
+                <button id="formationCloseBtn" class="pattern-close" aria-label="Close formation options" title="Close">✕</button>
+                <!-- Formation-specific headers and compasses (hidden by default) -->
+                <div id="circularEscortExtra" class="formation-extra" aria-hidden="true" style="display:none;">
+                  <div class="formation-extra-title">Fleet Weighting</div>
+                  <div class="compass-widget large" id="circularEscortCompass">
+                    <div class="dial">
+                      <div class="ticks"></div>
+                      <div class="needle planned"></div>
+                      <div class="needle actual"></div>
+                    </div>
+                  </div>
+                </div>
+                <div id="screenExtra" class="formation-extra" aria-hidden="true" style="display:none;">
+                  <div class="formation-extra-title">Screen Position</div>
+                  <div class="compass-widget large" id="screenCompass">
+                    <div class="dial">
+                      <div class="ticks"></div>
+                      <div class="needle planned"></div>
+                      <div class="needle actual"></div>
+                    </div>
+                  </div>
+                </div>
+                <div id="formationTurningRow" class="opt-row vertical">
+                  <span class="opt-label">Turning</span>
+                  <button id="formationTurnSeqBtn" type="button" class="opt-btn toggle-btn active" aria-pressed="true">Turn in Sequence</button>
+                  <button id="formationTurnTogetherBtn" type="button" class="opt-btn toggle-btn" aria-pressed="false">Turn Together</button>
+                </div>
+                <div class="opt-row">
+                  <label for="formationInterval" class="opt-label">Interval</label>
+                  <input id="formationInterval" class="opt-input" type="number" min="50" max="2000" step="10" value="300" />
+                  <span class="opt-unit">m</span>
+                </div>
+                <div id="formationWidthRow" class="opt-row" style="display:none;">
+                  <label for="formationWidth" class="opt-label">Width</label>
+                  <input id="formationWidth" class="opt-input" type="number" min="50" max="2000" step="10" value="200" />
+                  <span class="opt-unit">m</span>
+                </div>
+                <div id="formationAngleRow" class="opt-row">
+                  <label for="formationAngle" class="opt-label">Angle</label>
+                  <input id="formationAngle" class="opt-input" type="range" min="30" max="75" step="1" value="30" />
+                  <span id="formationAngleValue" class="opt-unit">30°</span>
+                </div>
+                <div class="opt-row vertical">
+                  <span class="opt-label">Station</span>
+                  <button id="formationFormUpBtn" type="button" class="opt-btn toggle-btn active" aria-pressed="true">Form Up</button>
+                  <div id="echelonDirRow" class="opt-row echelon-dir-row" aria-hidden="true">
+                    <button id="echelonLeftBtn" type="button" class="opt-btn toggle-btn" aria-pressed="false" title="Echelon Left">Left</button>
+                    <button id="formationFormUpBtnEchelon" type="button" class="opt-btn toggle-btn active" aria-pressed="true">Form Up</button>
+                    <button id="echelonRightBtn" type="button" class="opt-btn toggle-btn" aria-pressed="false" title="Echelon Right">Right</button>
+                  </div>
+                  <button id="formationAnchorBtn" type="button" class="opt-btn toggle-btn" aria-pressed="false">At Anchor</button>
+                </div>
+              </div>
+            </div>
+            <div class="stack-item">
+              <label class="pattern-label" for="patternSelect">Pattern</label>
+              <select id="patternSelect" class="formation-select" title="Pattern">
+                <option value="" selected>Select Pattern</option>
+                <option value="remove">Remove Pattern</option>
+                <option>Zig-Zag</option>
+                <option>Box Patrol</option>
+                <option>Tight Circle</option>
+                <option>Free Draw</option>
+              </select>
+              <!-- Pattern Options (floating window) -->
+              <div id="patternOptions" class="pattern-options pattern-window" aria-hidden="true" role="dialog" aria-label="Pattern Options">
+                <button id="patternCloseBtn" class="pattern-close" aria-label="Close pattern options" title="Close">✕</button>
+                <div class="opt-row">
+                  <label for="zigAmp" class="opt-label">Amplitude</label>
+                  <input id="zigAmp" class="opt-input" type="number" min="20" max="800" step="10" value="50" />
+                  <span class="opt-unit">px</span>
+                </div>
+
+                <div class="opt-row">
+                  <label for="zigWave" class="opt-label">Wavelength</label>
+                  <input id="zigWave" class="opt-input" type="number" min="40" max="2000" step="20" value="420" />
+                  <span class="opt-unit">px</span>
+                </div>
+                <div class="opt-row">
+                  <button id="zigLoopBtn" type="button" class="opt-btn toggle-btn" aria-pressed="false">Loop</button>
+                </div>
+                <div class="opt-row">
+                  <button id="zigReset" type="button" class="opt-btn">Reset</button>
+                </div>
+                <div class="opt-row">
+                  <span class="opt-hint">Place Waypoints</span>
+                </div>
+              </div>
+
+              <!-- Tight Circle Options (floating window) -->
+              <div id="circleOptions" class="pattern-options pattern-window" aria-hidden="true" role="dialog" aria-label="Tight Circle Options">
+                <button id="circleCloseBtn" class="pattern-close" aria-label="Close circle options" title="Close">✕</button>
+                <div class="opt-row vertical">
+                  <span class="opt-label">Direction</span>
+                  <button id="circleDirCwBtn" type="button" class="opt-btn toggle-btn active">Clockwise</button>
+                  <button id="circleDirCcwBtn" type="button" class="opt-btn toggle-btn">Counterclockwise</button>
+                </div>
+                <div class="opt-row opt-actions">
+                  <button id="circleLoopBtn" type="button" class="opt-btn toggle-btn active" aria-pressed="true">Loop</button>
+                </div>
+                <div class="opt-row">
+                  <button id="circleReset" type="button" class="opt-btn">Reset</button>
+                </div>
+                <div class="opt-row">
+                  <span class="opt-label">Place Antipodal Points</span>
+                </div>
+              </div>
+
+              <!-- Box Patrol Options (floating window) -->
+              <div id="boxOptions" class="pattern-options pattern-window" aria-hidden="true" role="dialog" aria-label="Box Patrol Options">
+                <button id="boxCloseBtn" class="pattern-close" aria-label="Close box options" title="Close">✕</button>
+                <div class="opt-row vertical">
+                  <span class="opt-label">Direction</span>
+                  <button id="boxDirCwBtn" type="button" class="opt-btn toggle-btn active">Clockwise</button>
+                  <button id="boxDirCcwBtn" type="button" class="opt-btn toggle-btn">Counterclockwise</button>
+                </div>
+                <div class="opt-row opt-actions">
+                  <button id="boxLoopBtn" type="button" class="opt-btn toggle-btn active" aria-pressed="true">Loop</button>
+                </div>
+                <div class="opt-row">
+                  <button id="boxReset" type="button" class="opt-btn">Reset</button>
+                </div>
+                <div class="opt-row">
+                  <span class="opt-label">Place Waypoints</span>
+                </div>
+              </div>
+
+              <!-- Free Draw Options (floating window) -->
+              <div id="freeDrawOptions" class="pattern-options pattern-window" aria-hidden="true" role="dialog" aria-label="Free Draw Options">
+                <button id="freeDrawCloseBtn" class="pattern-close" aria-label="Close free draw options" title="Close">✕</button>
+                <div class="opt-row vertical">
+                  <span class="opt-label">Direction</span>
+                  <button id="freeDrawDirCwBtn" type="button" class="opt-btn toggle-btn active">Clockwise</button>
+                  <button id="freeDrawDirCcwBtn" type="button" class="opt-btn toggle-btn">Counterclockwise</button>
+                </div>
+                <div class="opt-row opt-actions">
+                  <button id="freeDrawLoopBtn" type="button" class="opt-btn toggle-btn active" aria-pressed="true">Loop</button>
+                </div>
+                <div class="opt-row">
+                  <button id="freeDrawReset" type="button" class="opt-btn">Reset</button>
+                </div>
+                <div class="opt-row">
+                  <span class="opt-hint">Place waypoints, click first to close loop</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="group actions" id="fleet1GunneryActions">
+          <div class="compass-widget" id="turretCompass" data-type="turret">
+            <div class="dial">
+              <div class="ticks"></div>
+              <div class="needle planned"></div>
+              <div class="needle actual"></div>
+              <div class="label">Turrets</div>
+            </div>
+          </div>
+          <div class="gunnery-block">
+            <div class="solution-row">
+              <button class="get-firing-solution-btn" data-fleet="1">Solution</button>
+              <div id="accuracyPanel" class="gunnery-solution-display" aria-live="polite" title="Estimated hit probability">Accuracy: --%</div>
+            </div>
+            <button class="fire-btn" data-fleet="1">FIRE</button>
+          </div>
+        </div>
+        <div class="group actions" id="fleet2GunneryActions" style="display:none;">
+          <div class="compass-widget" id="turretCompass2" data-type="turret">
+            <div class="dial">
+              <div class="ticks"></div>
+              <div class="needle planned"></div>
+              <div class="needle actual"></div>
+              <div class="label">Turrets</div>
+            </div>
+          </div>
+          <div class="gunnery-block">
+            <div class="solution-row">
+              <button class="get-firing-solution-btn" data-fleet="2">Solution</button>
+              <div id="accuracyPanel2" class="gunnery-solution-display" aria-live="polite" title="Estimated hit probability">Accuracy: --%</div>
+            </div>
+            <button class="fire-btn" data-fleet="2">FIRE</button>
+          </div>
+        </div>
+        <div class="group actions" id="fleet3GunneryActions" style="display:none;">
+          <div class="compass-widget" id="turretCompass3" data-type="turret">
+            <div class="dial">
+              <div class="ticks"></div>
+              <div class="needle planned"></div>
+              <div class="needle actual"></div>
+              <div class="label">Turrets</div>
+            </div>
+          </div>
+          <div class="gunnery-block">
+            <div class="solution-row">
+              <button class="get-firing-solution-btn" data-fleet="3">Solution</button>
+              <div id="accuracyPanel3" class="gunnery-solution-display" aria-live="polite" title="Estimated hit probability">Accuracy: --%</div>
+            </div>
+            <button class="fire-btn" data-fleet="3">FIRE</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fleet 2 Gunnery Controls -->
+  <div class="fleet-gunnery-panel" id="fleet2GunneryPanel">
+    <div class="fleet-gunnery-header">Fleet 2 Gunnery</div>
+    <div class="fleet-gunnery-controls">
+      <button id="fleet2TargetBtn" class="fleet-target-btn">Set Target</button>
+      <button id="fleet2FireBtn" class="fleet-fire-btn">FIRE</button>
+      <div id="fleet2TargetDisplay" class="fleet-target-display">No Target</div>
+    </div>
+  </div>
+
+  <!-- Fleet 3 Gunnery Controls -->
+  <div class="fleet-gunnery-panel" id="fleet3GunneryPanel">
+    <div class="fleet-gunnery-header">Fleet 3 Gunnery</div>
+    <div class="fleet-gunnery-controls">
+      <button id="fleet3TargetBtn" class="fleet-target-btn">Set Target</button>
+      <button id="fleet3FireBtn" class="fleet-fire-btn">FIRE</button>
+      <div id="fleet3TargetDisplay" class="fleet-target-display">No Target</div>
+    </div>
+  </div>
+
+  <script src="start.js?v=2"></script>
+
+
+  <!-- Fleet 1 Management Window -->
+  <div id="fleetManagement1" class="pattern-options pattern-window fleet-management-window" aria-hidden="true" role="dialog" aria-label="Fleet 1 Management">
+    <button id="fleetManagement1CloseBtn" class="pattern-close" aria-label="Close fleet 1 management" title="Close">✕</button>
+    <div class="fleet-management-header">
+      <h3>Fleet 1 Management</h3>
+    </div>
+    <div class="fleet-management-content">
+      <div class="fleet-ships-section">
+        <div class="fleet-ships-header">Ships in Fleet 1</div>
+        <div id="fleetShipsList1" class="fleet-ships-list">
+          <!-- Ships will be populated here -->
+        </div>
+      </div>
+      <div class="fleet-transfer-section">
+        <div class="fleet-transfer-header">Transfer Ships To:</div>
+        <div id="fleetTransferFleet2From1" class="fleet-transfer-zone collapsed" data-target-fleet="2" data-source-fleet="1">
+          <div class="fleet-transfer-title">Fleet 2</div>
+          <div class="fleet-transfer-dropzone">Drop ships here to transfer to Fleet 2</div>
+        </div>
+        <div id="fleetTransferFleet3From1" class="fleet-transfer-zone collapsed" data-target-fleet="3" data-source-fleet="1">
+          <div class="fleet-transfer-title">Fleet 3</div>
+          <div class="fleet-transfer-dropzone">Drop ships here to transfer to Fleet 3</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fleet 2 Management Window -->
+  <div id="fleetManagement2" class="pattern-options pattern-window fleet-management-window" aria-hidden="true" role="dialog" aria-label="Fleet 2 Management">
+    <button id="fleetManagement2CloseBtn" class="pattern-close" aria-label="Close fleet 2 management" title="Close">✕</button>
+    <div class="fleet-management-header">
+      <h3>Fleet 2 Management</h3>
+    </div>
+    <div class="fleet-management-content">
+      <div class="fleet-ships-section">
+        <div class="fleet-ships-header">Ships in Fleet 2</div>
+        <div id="fleetShipsList2" class="fleet-ships-list">
+          <!-- Ships will be populated here -->
+        </div>
+      </div>
+      <div class="fleet-transfer-section">
+        <div class="fleet-transfer-header">Transfer Ships To:</div>
+        <div id="fleetTransferFleet1From2" class="fleet-transfer-zone collapsed" data-target-fleet="1" data-source-fleet="2">
+          <div class="fleet-transfer-title">Fleet 1</div>
+          <div class="fleet-transfer-dropzone">Drop ships here to transfer to Fleet 1</div>
+        </div>
+        <div id="fleetTransferFleet3From2" class="fleet-transfer-zone collapsed" data-target-fleet="3" data-source-fleet="2">
+          <div class="fleet-transfer-title">Fleet 3</div>
+          <div class="fleet-transfer-dropzone">Drop ships here to transfer to Fleet 3</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fleet 3 Management Window -->
+  <div id="fleetManagement3" class="pattern-options pattern-window fleet-management-window" aria-hidden="true" role="dialog" aria-label="Fleet 3 Management">
+    <button id="fleetManagement3CloseBtn" class="pattern-close" aria-label="Close fleet 3 management" title="Close">✕</button>
+    <div class="fleet-management-header">
+      <h3>Fleet 3 Management</h3>
+    </div>
+    <div class="fleet-management-content">
+      <div class="fleet-ships-section">
+        <div class="fleet-ships-header">Ships in Fleet 3</div>
+        <div id="fleetShipsList3" class="fleet-ships-list">
+          <!-- Ships will be populated here -->
+        </div>
+      </div>
+      <div class="fleet-transfer-section">
+        <div class="fleet-transfer-header">Transfer Ships To:</div>
+        <div id="fleetTransferFleet1From3" class="fleet-transfer-zone collapsed" data-target-fleet="1" data-source-fleet="3">
+          <div class="fleet-transfer-title">Fleet 1</div>
+          <div class="fleet-transfer-dropzone">Drop ships here to transfer to Fleet 1</div>
+        </div>
+        <div id="fleetTransferFleet2From3" class="fleet-transfer-zone collapsed" data-target-fleet="2" data-source-fleet="3">
+          <div class="fleet-transfer-title">Fleet 2</div>
+          <div class="fleet-transfer-dropzone">Drop ships here to transfer to Fleet 2</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="bismarck.js"></script>
+  <script src="ships.js"></script>
+  <script src="transport.js"></script>
+  <script src="prinzeugen.js"></script>
+  <script src="damageModel.js"></script>
+  <script src="firingsolution.js"></script>
+  <script src="game.js?v=24"></script>
+
+  <!-- Wind Compass (top-right) -->
+  <div id="windWidget" class="wind-widget" aria-label="Wind Direction">
+    <div class="wind-dial">
+      <div class="wind-ticks"></div>
+      <div class="wind-cardinal wind-n">N</div>
+      <div class="wind-cardinal wind-e">E</div>
+      <div class="wind-cardinal wind-s">S</div>
+      <div class="wind-cardinal wind-w">W</div>
+      <div id="windArrow" class="wind-arrow" role="img" aria-label="Wind Arrow"></div>
+      <div class="wind-label">Wind · <span id="windSpeedKts">-- kts</span></div>
+    </div>
+  </div>
+  
+  <!-- Global Mute Toggle (brass style, sits just beneath wind widget) -->
+  <button id="muteToggle" class="mute-toggle" aria-pressed="false" title="Mute all sound" aria-label="Mute all sound">🔊</button>
+  
+  <!-- Ship HUD (bottom-left, over modal, like helper windows) -->
+  <div id="shipHud" class="ship-hud" aria-label="Ship Status HUD">
+    <canvas id="shipHudCanvas" width="260" height="390" aria-hidden="false"></canvas>
+  </div>
+  <!-- Ship HUD (bottom-left) for Transport ships - separate container to prevent conflicts on left -->
+  <div id="shipHudLeftTransport" class="ship-hud" aria-label="Transport Status HUD (Left)" style="display: none;">
+    <canvas id="shipHudCanvasLeftTransport" width="260" height="390" aria-hidden="false"></canvas>
+  </div>
+  <!-- Ship HUD (bottom-right) for Bismarck/Battleships -->
+  <div id="shipHudRight" class="ship-hud right" aria-label="Bismarck Status HUD (Right)">
+    <canvas id="shipHudCanvasRight" width="260" height="390" aria-hidden="false"></canvas>
+  </div>
+  <!-- Ship HUD (bottom-right) for Transport ships - separate container to prevent conflicts -->
+  <div id="shipHudTransport" class="ship-hud right" aria-label="Transport Status HUD (Right)" style="display: none;">
+    <canvas id="shipHudCanvasTransport" width="260" height="390" aria-hidden="false"></canvas>
+  </div>
+  <!-- Ship HUD (bottom-right) for Cruiser ships - separate container to prevent conflicts with Bismarck -->
+  <div id="shipHudCruiser" class="ship-hud right" aria-label="Cruiser Status HUD (Right)" style="display: none;">
+    <canvas id="shipHudCanvasCruiser" width="260" height="390" aria-hidden="false"></canvas>
+  </div>
+</body>
+<script src="assets/ships_debug.js"></script>
+</html>

@@ -1,0 +1,189 @@
+line 531
+engOverlapSec:
+
+also, sunk fleet leader should vanish, no png no smoke, cannot select it in the EYE cycle. Also remove all other sunjk ships from the EYE cycle
+
+line 437
+aiming range
+const radius = 12.5
+
+line 56
+add more ambient samples
+      'assets/audio/seagulls1.mp3',
+
+line 12
+Smoke amounts for damage
+durationSec and ratePerSec.
+
+fix turret decimals
+
+x fix transport firing
+
+fix follow speed and interval
+
+
+Length: ~251 m
+
+Beam: 36 m
+
+Draft: 9.3 m
+
+Displacement: ~50,900 tons (full load)
+
+Prinz Eugen:
+
+Length: ~207 m
+
+Beam: 21.7 m
+
+Draft: 7.2 m
+
+Displacement: ~19,000 tons (full load)
+
+🔫 Armament
+
+Bismarck:
+
+Main: 8 × 38 cm (15 in) guns (4 twin turrets)
+
+Secondary: 12 × 15 cm (5.9 in) guns
+
+AA: 16 × 10.5 cm, plus 37 mm and 20 mm guns
+
+Torpedoes: None
+
+Prinz Eugen:
+
+Main: 8 × 20.3 cm (8 in) guns (4 twin turrets)
+
+Secondary: 12 × 10.5 cm (dual-purpose)
+
+AA: 37 mm and 20 mm guns
+
+Torpedoes: 12 × 533 mm tubes
+
+🛡️ Armor
+
+Bismarck:
+
+Belt: up to 320 mm
+
+Deck: up to 120 mm
+
+Turrets: up to 360 mm
+
+Prinz Eugen:
+
+Belt: up to 80 mm
+
+Deck: up to 30 mm
+
+Turrets: up to 105 mm
+
+⚡ Propulsion & Speed
+
+Bismarck:
+
+Power: ~150,000 shp
+
+Speed: 30.8 knots
+
+Range: ~8,900 nmi at 16 knots
+
+Prinz Eugen:
+
+Power: ~132,000 shp
+
+Speed: 32 knots
+
+Range: ~6,800 nmi at 12 knots
+
+***
+
+mobile tweaks 
+
+make pins draggable
+
+x preset the debug
+
+x island should be collidable
+
+x pin hand not working
+
+ship sinks when 3 hulls sections 100%
+
+x fleet 2 and 3 need the degrees put back on their compass.
+
+x the Fleet 2 Gunnery and Fleet 3 Gunnery buttons should TOGGLE ON AND OFF
+
+x clicking on a fleet and toggling gunnery on should bring up that fleet leaders target circle, distinct from the fleet one target circle
+
+x fleet 2 and 3 need their turret lines to go green when aligned and firing
+
+x fleet 1 has fire button AUTO on, i dont want that, i want to press fire myself
+
+
+
+
+
+
+
+gpt map prompt
+
+# Zooming System (Committed Design)
+
+This document captures the zooming system currently implemented so it can be restored or referenced later.
+
+## Summary
+- Zoom control is a vertical slider drawn on the canvas at the top-left.
+- The slider value controls ONLY the ship and turret sizes (no map at the moment).
+- The slider range and labels:
+  - Top label: IN (max size)
+  - Bottom label: OUT (min size)
+  - Range: value ∈ [0.25, 2.5]
+    - IN (top): 2.5× (max zoom-in for detail)
+    - OUT (bottom): 0.25× (4× smaller than base)
+- Turrets scale proportionally with the ship at 17.5% of hull width, and outer turrets (IDs 3,5) are offset outward by 5px.
+
+## Implementation
+- File: `compass.js`
+- Key symbols and sections:
+  - Slider state and helpers (near compass layout):
+    - `zoomOutSlider = { x: 16, y: 16, w: 22, h: 160, dragging: false, min: 0.25, max: 2.5, value: 1.0 }`
+    - `setZoomOutFromPos(py)`
+    - `sliderPosFromZoomOut()`
+    - `drawZoomOutSlider()`
+    - `hitZoomOutSlider(px, py)`
+  - Input integration:
+    - In `pointerDown(evt)`: checks `hitZoomOutSlider()` and begins dragging.
+    - In `pointerMove(evt)`: updates value while dragging.
+    - In `pointerUp()`: stops dragging.
+  - Rendering hookup:
+    - Game loop calls `drawZoomOutSlider()` along with other UI overlays.
+  - Ship scaling:
+    - In `drawShip()`:
+      - Base height `targetHBase = 160` pixels.
+      - `targetH = Math.round(targetHBase * zoomOutSlider.value)`
+      - Ship scale is clamped on the upscale side to `≤ 2.5×` native texture to preserve quality.
+      - Final width/height are rounded to integers and drawn with high image smoothing quality enabled for crispness.
+  - Turret scaling:
+    - Turrets scale from the computed ship width/height.
+    - Size is `0.175 × shipWidth` (i.e., 30% smaller than the original 25%).
+    - Per-draw smoothing is set to high, and translation is snapped to integer pixels.
+
+## Notes / Rationale
+- We use device pixel ratio for the canvas and enable image smoothing for crisp rendering.
+- We snap sprite translations and sizes to integer pixels to reduce sub-pixel blur.
+- The map and world zoom were removed to avoid double-render artifacts; the slider currently affects only ship/turret size.
+- If reintroducing map zoom later, use a single world transform (scale + translate) applied once per frame for all world elements to prevent misalignment and ghosting.
+
+## How to Tweak
+- Change slider bounds in `zoomOutSlider.min/max`.
+- Change base ship height by adjusting `targetHBase` in `drawShip()`.
+- Adjust turret ratio by modifying the factor `0.175` in `drawShip()`.
+- Move the slider by editing `zoomOutSlider.x/y`.
+
+## Future Option (Map)
+- Reintroduce map zoom by computing a single `scale` and `(sx, sy)` per frame and using one canvas transform:
+  - `ctx.scale(scale, scale); ctx.translate(-sx, -sy);`
+  - Then draw the map and ship/turrets in world coordinates.

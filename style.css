@@ -1,0 +1,1956 @@
+body {
+  margin: 0;
+  background: #02243a; /* deep sea */
+  color: #cde7ff; /* light nautical */
+  font-family: 'Segoe UI', Arial, sans-serif;
+  overflow: hidden;
+}
+/* Right-side HUD placement */
+.ship-hud.right {
+  left: auto;
+  right: 0;
+  padding: 0; /* Remove padding so HUD sits flush in bottom-right corner */
+}
+
+/* Responsive snapshot variables (Desktop default) */
+:root {
+  /* Dock placement */
+  --dock-left: 0px;
+  --dock-bottom: 0px;
+  /* Dock height (auto on desktop) */
+  --dock-height: auto;
+  /* Dock padding */
+  --dock-pad-x: 8px;
+  --dock-pad-y: 6px;
+  /* Dock grid gaps */
+  --dock-col-gap: 12px;
+  --dock-row-gap: 6px;
+  /* Compass and related widget sizing */
+  --compass-size: 76px;
+
+  /* Generic modal sizing (defaults are full-screen) */
+  --modal-top: 0;
+  --modal-left: 0;
+  --modal-right: auto;
+  --modal-bottom: auto;
+  --modal-width: 100vw;
+  --modal-height: 100dvh;
+}
+
+/* Mobile Portrait snapshot */
+@media (max-width: 768px) and (orientation: portrait) {
+  /* Prevent any horizontal scroll that can reveal a sliver */
+  html, body { overflow-x: hidden; }
+  /* Remove canvas trim on portrait to avoid any visible sliver around edges */
+  #gameCanvas { border: none !important; }
+  :root {
+    --dock-left: 0px;
+    --dock-bottom: 0px;
+    --dock-height: 25vh; /* unchanged for dock */
+    --dock-pad-x: 6px;
+    --dock-pad-y: 4px;
+
+    /* Make modal a bottom sheet in portrait */
+    --modal-top: auto;
+    --modal-left: 0;
+    --modal-right: 0;
+    --modal-bottom: 0;
+    --modal-width: 100%;
+    --modal-height: 20vh;
+  }
+  /* Ensure modal sits at the bottom edge-to-edge on portrait */
+  #navalControlModal.modal.naval-theme {
+    /* remove decorative rounding/shadows that can reveal the map around edges */
+    background: #0a1822; /* opaque (no transparency) */
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    box-sizing: border-box; /* include border in computed size to avoid overflow */
+    position: fixed !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: 20vh !important;      /* compact sheet height */
+    min-height: 20vh !important;
+    margin: 0 !important;
+    /* remove border entirely to avoid any brass trim showing */
+    border: none !important;
+    outline: none !important;
+    z-index: 10000 !important; /* ensure on top of everything */
+  }
+  #navalControlModal.modal.naval-theme::before,
+  #navalControlModal.modal.naval-theme::after {
+    display: none !important; /* remove decorative insets that could show at edges */
+  }
+  /* Place the dock at the bottom edge-to-edge on portrait */
+  #navalDock.dock.naval-theme {
+    position: fixed !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: var(--dock-height) !important;
+    max-height: var(--dock-height) !important;
+    margin: 0 !important;
+    z-index: 10001 !important;
+    background: #1d2429 !important; /* opaque */
+    border: none !important;        /* remove brass seam entirely */
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow-x: auto !important;    /* scroll internal content if needed */
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch; /* momentum scroll on iOS */
+    font-size: 0.85rem; /* compact */
+  }
+  /* Keep two-column layout and allow content to exceed viewport width */
+  #navalDock .dock-panel {
+    grid-template-columns: auto auto; /* left cluster | right cluster */
+    width: max-content; /* grow beyond viewport so we can scroll */
+  }
+  /* Reduce gaps further on mobile portrait */
+  #navalDock .group { gap: 4px; }
+  /* Button sizing reductions */
+  #navalDock .fleet-btn,
+  #navalDock .tactical-map-btn,
+  #navalDock .get-firing-solution-btn,
+  #navalDock .fire-btn,
+  #navalDock .gunnery-title-btn {
+    font-size: 0.82em;
+    padding: 4px 7px;
+  }
+  /* Gunnery block text/readouts smaller */
+  #navalDock .group.actions .solution-row { gap: 6px; }
+  #navalDock .group.actions .solution-row .readout { font-size: 0.8em; }
+  /* Formation and pattern selects smaller */
+  #navalDock .formation-select,
+  #navalDock .target-selector {
+    font-size: 0.85em;
+    padding: 2px 5px;
+  }
+  /* Labels smaller */
+  #navalDock .formation-label,
+  #navalDock .pattern-label,
+  #navalDock .speed-label,
+  #navalDock .speed-readout { font-size: 0.8em; }
+}
+
+/* Mobile Landscape snapshot */
+@media (max-width: 1024px) and (orientation: landscape) {
+  :root {
+    --dock-left: 0px;
+    --dock-bottom: 0px;
+    --dock-pad-x: 6px;
+    --dock-pad-y: 4px;
+    --dock-col-gap: 10px;
+    --dock-row-gap: 5px;
+    --compass-size: 70px;
+  }
+}
+
+/* Box Patrol window: force left alignment for all content */
+#boxOptions { text-align: left; }
+#boxOptions .opt-row { align-items: flex-start; justify-content: flex-start; }
+#boxOptions .opt-row.opt-actions { justify-content: flex-start; gap: 10px; }
+#boxOptions .opt-row.opt-actions { justify-content: flex-start; gap: 10px; }
+#boxOptions .opt-label { align-self: flex-start; }
+#boxOptions .toggle-btn { align-self: flex-start; }
+
+/* Floating Pattern Options Window */
+.pattern-options.pattern-window {
+  position: fixed;
+  bottom: 0; /* attach to bottom edge */
+  left: 0;   /* attach to left edge */
+  min-width: 240px;
+  max-width: 320px;
+  background: #232c32;
+  border: 2px solid #bfa76a;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.55);
+  padding: 12px 12px 10px 12px;
+  z-index: 1001; /* above modal so helpers cover the modal, not the map */
+}
+.pattern-options.pattern-window[aria-hidden="true"] { display: none; }
+.pattern-options.pattern-window.show { display: block; }
+.ship-hud {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  padding: 8px;
+  background: rgba(20,26,30,0.92);
+  border: 2px solid #bfa76a;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.55);
+  z-index: 1002; /* above modal and helper windows */
+  display: none; /* hidden by default; click a ship to open */
+}
+/* Ensure right-side HUDs (Battleship, Transport, Cruiser) sit flush in the corner */
+.ship-hud.right {
+  left: auto;
+  right: 0;
+  padding: 0;
+}
+/* Transport HUD: hard-pin to bottom-right with no visual gap */
+#shipHudTransport {
+  position: fixed;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 10px !important; /* match other HUDs */
+}
+#shipHudTransport canvas {
+  display: block; /* remove inline baseline gaps */
+}
+/* Hide HUD on very small screens to avoid overlap if desired */
+@media (max-width: 520px) and (orientation: portrait) {
+  .ship-hud { display: none; }
+}
+
+/* Mobile Portrait: ship HUD fills half the screen vertically (do not force open) */
+@media (max-width: 768px) and (orientation: portrait) {
+  .ship-hud {
+    transform: none;                  /* no scaling; use explicit height */
+    height: 50vh;                     /* half of viewport height */
+    max-height: 50vh;
+    min-height: 50vh;
+    overflow: auto;                   /* scroll if content exceeds half-screen */
+    transform-origin: bottom left;
+    z-index: 20002 !important; /* above #navalDock (10001) and #navalControlModal (10000) */
+  }
+  .ship-hud.right {
+    transform-origin: bottom right;
+  }
+}
+
+/* Ship HUD close (X) button */
+.ship-hud .hud-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid #bfa76a; /* brass rim */
+  background:
+    linear-gradient(180deg, #d6c691 0%, #bda66e 45%, #9e8f5a 46%, #7c6f46 100%);
+  color: #232c32;
+  font-weight: 800;
+  line-height: 18px;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 2px 4px rgba(0,0,0,0.5), 0 0 0 1px rgba(26,26,26,0.4);
+  text-shadow: 0 0 1px rgba(255,255,255,0.4);
+  pointer-events: auto; /* ensure clickable even if parent sets none elsewhere */
+}
+.ship-hud .hud-close:active { filter: brightness(0.95); transform: translateY(1px); }
+
+@media (max-width: 1024px) and (orientation: landscape) {
+  .ship-hud {
+    transform: scale(0.5);
+    transform-origin: bottom left;
+    z-index: 20002 !important;
+  }
+  .ship-hud.right { transform-origin: bottom right; }
+  /* Transport HUD should remain flush; do not scale on landscape */
+  #shipHudTransport { transform: none !important; }
+}
+.pattern-options.pattern-window .pattern-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 20px; /* match HUD close height proportion */
+  border-radius: 6px;
+  border: 2px solid #bfa76a; /* brass rim */
+  background:
+    linear-gradient(180deg, #d6c691 0%, #bda66e 45%, #9e8f5a 46%, #7c6f46 100%);
+  color: #232c32;
+  font-weight: 800;
+  line-height: 16px;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 2px 4px rgba(0,0,0,0.5), 0 0 0 1px rgba(26,26,26,0.4);
+  text-shadow: 0 0 1px rgba(255,255,255,0.4);
+}
+.pattern-options.pattern-window .pattern-close:active {
+  filter: brightness(0.95);
+  transform: translateY(1px);
+}
+.pattern-options .opt-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.pattern-options .opt-row.vertical { flex-direction: column; align-items: flex-start; gap: 6px; }
+.pattern-options .opt-row.vertical .opt-btn { align-self: flex-start; }
+.pattern-options .opt-row.vertical .opt-label { align-self: flex-start; }
+.pattern-options .opt-row.opt-actions { justify-content: space-between; }
+.pattern-options .opt-row.opt-actions-right { justify-content: flex-end; }
+.pattern-options .formation-extra { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; margin: 4px 0 8px 0; width: 100%; text-align: center; }
+.pattern-options .formation-extra-title { text-align: center; color: #bfa76a; font-family: 'Orbitron', 'Arial', sans-serif; font-weight: 700; }
+.pattern-options .formation-extra .compass-widget { margin-left: auto; margin-right: auto; }
+.pattern-options .opt-row.echelon-dir-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap; /* keep on one line */
+}
+.pattern-options .opt-row.echelon-dir-row .opt-btn {
+  padding: 5px 10px; /* compact so it fits window */
+}
+.pattern-options .opt-label { color: #bfa76a; font-family: 'Orbitron', 'Arial', sans-serif; font-size: 0.9em; }
+.pattern-options .opt-input { flex: 1 1 auto; background: #1d2429; color: #e7e1c1; border: 1px solid #7d868b; border-radius: 6px; padding: 4px 6px; }
+.pattern-options .opt-unit { color: #9e8f5a; font-size: 0.85em; }
+.pattern-options .opt-hint { color: #9e8f5a; font-family: 'Orbitron', 'Arial', sans-serif; font-size: 0.85em; opacity: 0.9; }
+.pattern-options .opt-btn { background: #27313a; color: #e7e1c1; border: 2px solid #bfa76a; border-radius: 7px; padding: 5px 10px; cursor: pointer; }
+.pattern-options .opt-btn:active { background: #bfa76a; color: #27313a; }
+.pattern-options .toggle-btn { text-align: left; padding: 8px 12px; font-family: 'Orbitron', 'Arial', sans-serif; }
+.pattern-options .toggle-btn.active {
+  background: #bfa76a;
+  color: #27313a;
+  border-color: #e7e1c1;
+  box-shadow: 0 0 0 1px rgba(26,26,26,0.3) inset;
+  outline: 2px solid #e7e1c1;
+}
+
+#gameCanvas {
+  display: block;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100dvh; /* dynamic viewport height for mobile browsers */
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  background: transparent !important; /* drawn by game */
+  border: 4px solid #cde7ff; /* nautical trim */
+  z-index: 1;
+}
+
+/* On touch devices, allow pinch-zoom so users can zoom the map further */
+@media (pointer: coarse) {
+  #gameCanvas {
+    touch-action: pinch-zoom pan-x pan-y;
+    -ms-touch-action: pinch-zoom;
+  }
+  /* Hide Radio Chatter title and box on all mobile orientations */
+  #radio-title,
+  #radio-chatter {
+    display: none !important;
+  }
+}
+
+/* Fallback: hide radio UI on small screens (phones) regardless of pointer detection */
+@media (max-width: 768px) {
+  #radio-title,
+  #radio-chatter {
+    display: none !important;
+  }
+}
+
+/* Explicitly hide on mobile landscape as well */
+@media (max-width: 1024px) and (orientation: landscape) {
+  #radio-title,
+  #radio-chatter {
+    display: none !important;
+  }
+}
+
+#hud {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: auto;
+  width: 320px;
+  padding: 20px 20px 20px 10px;
+  z-index: 10;
+  color: #fff;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 1.03rem;
+  pointer-events: none;
+  text-align: right;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap');
+
+.stat-table, #score-bar {
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  letter-spacing: 0.5px;
+}
+
+.blue-glow {
+  color: #0ff;
+  text-shadow: 0 0 6px #0ff, 0 0 18px #0ff, 0 0 32px #0ff;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+}
+
+.stat-table td.green, .stat-table .green td {
+  color: #0f0;
+  text-shadow: 0 0 6px #0f0, 0 0 18px #0f0, 0 0 32px #0f0;
+}
+.stat-table td.red, .stat-table .red td {
+  color: #f33;
+  text-shadow: 0 0 6px #f33, 0 0 18px #f33, 0 0 32px #f33;
+}
+.stat-table td.yellow, .stat-table .yellow td {
+  color: #ff0;
+  text-shadow: 0 0 6px #ff0, 0 0 18px #ff0, 0 0 32px #ff0;
+}
+
+#score-bar {
+  margin-top: 8px;
+  font-size: 1.12em;
+  font-weight: bold;
+  text-align: right;
+}
+
+
+#hud h2#planes-title {
+  color: #fff;
+  margin-top: 0;
+  text-shadow: 0 0 10px #fff, 0 0 2px #0ff;
+  font-weight: bold;
+}
+
+.stat-table, .score-table {
+  width: auto;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+  font-size: 1.09em;
+  text-align: right;
+  margin-left: auto;
+}
+.stat-table td, .score-table td, .score-table th {
+  padding: 1px 2px;
+  background: rgba(0,0,0,0.3);
+  border: none;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  white-space: nowrap;
+}
+.stat-table td.green, .stat-table .green td { color: #0f0; }
+.stat-table td.red, .stat-table .red td { color: #f33; }
+.stat-table td.yellow, .stat-table .yellow td { color: #ff0; }
+.score-table th.blue { color: #0ff; text-shadow: 0 0 8px #0ff, 0 0 32px #0ff; font-weight: bold; font-size: 1.02em; text-align: right; }
+.score-table td { color: #fff; font-weight: bold; font-size: 1.04em; text-align: right; }
+
+
+.stat-group span {
+  display: block;
+  text-align: right;
+  font-size: 0.93em;
+}
+
+.stat-group.green span {
+  color: #0f0;
+  text-shadow: 0 0 8px #0f0, 0 0 2px #fff;
+  font-weight: bold;
+}
+
+.stat-group.red span {
+  color: #f00;
+  text-shadow: 0 0 8px #f00, 0 0 2px #fff;
+  font-weight: bold;
+}
+
+.stat-group.yellow span {
+  color: #ff0;
+  text-shadow: 0 0 8px #ff0, 0 0 2px #fff;
+  font-weight: bold;
+}
+
+.stat-group.cyan span {
+  color: #0ff;
+  text-shadow: 0 0 8px #0ff, 0 0 2px #fff;
+  font-weight: bold;
+}
+
+#hud h2 {
+  margin-top: 0.5em;
+  margin-bottom: 0.2em;
+  letter-spacing: 1px;
+  font-size: 1.05em;
+  font-weight: bold;
+  text-shadow: 0 0 6px #0ff, 0 0 16px #0ff;
+  text-transform: uppercase;
+  pointer-events: auto;
+  text-align: right;
+}
+
+#hud h2.blue, #hud h2#weather-title {
+  color: #0ff;
+  text-shadow: 0 0 8px #0ff, 0 0 32px #0ff;
+  text-align: right;
+  font-weight: bold;
+}
+
+#stats, #weather-stats {
+  font-size: 1em;
+  margin-bottom: 1em;
+}
+
+h2#weather-title {
+  color: #0ff;
+  margin: 1em 0 0.5em 0;
+  text-shadow: 0 0 10px #0ff, 0 0 2px #fff;
+}
+
+
+/* WWII Naval Game Control Modal Styling */
+
+#navalControlModal.modal.naval-theme {
+  position: fixed;
+  top: var(--modal-top); left: var(--modal-left); right: var(--modal-right); bottom: var(--modal-bottom);
+  width: var(--modal-width); height: var(--modal-height);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: rgba(10, 24, 34, 0.93);
+  border: 6px solid #bfa76a; /* brass trim */
+  box-shadow: 0 0 40px #000b, 0 0 0 12px #333a, 0 0 0 22px #bfa76a44;
+  pointer-events: auto;
+  overflow: auto;
+}
+
+.modal-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  background: linear-gradient(90deg, #3f4a4e 0%, #7d868b 100%);
+  border-bottom: 3px solid #bfa76a;
+  padding: 10px 22px;
+  gap: 18px;
+}
+
+.fleet-btn, .tactical-map-btn {
+  background: #27313a;
+  color: #e7e1c1;
+  border: 2.5px solid #bfa76a;
+  border-radius: 12px;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 1.18em;
+  padding: 10px 24px; /* Reduced from 28px to make room for manage buttons */
+  margin-right: 0; /* no gaps between fleet and i buttons */
+  box-shadow: 0 2px 0 #bfa76a, 0 4px 10px #0008;
+  letter-spacing: 1.2px;
+  transition: background 0.15s, transform 0.1s;
+  cursor: pointer;
+  position: relative;
+}
+.fleet-btn:active, .tactical-map-btn:active {
+  background: #bfa76a;
+  color: #27313a;
+  transform: scale(0.97);
+}
+
+/* Fleet Management Buttons */
+.fleet-manage-btn {
+  background: #27313a;
+  color: #e7e1c1;
+  border: 2.5px solid #bfa76a;
+  border-radius: 50%;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 1em;
+  font-weight: bold;
+  width: 32px;
+  height: 32px;
+  margin-right: 4px;
+  box-shadow: 0 2px 0 #bfa76a, 0 4px 10px #0008;
+  transition: background 0.15s, transform 0.1s;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.fleet-manage-btn:hover {
+  background: #3a4650;
+}
+.fleet-manage-btn:active {
+  background: #bfa76a;
+  color: #27313a;
+  transform: scale(0.95);
+}
+
+/* Fleet Management Window */
+.fleet-management-window {
+  /* Inherit fixed bottom-left from .pattern-options.pattern-window */
+  width: 320px;
+  max-height: 55vh;
+  height: auto;
+  background: linear-gradient(135deg, #232c32 80%, #bfa76a22 100%);
+  border: 2px solid #bfa76a;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.55);
+}
+
+.fleet-management-header {
+  padding: 10px 12px 8px 12px;
+  border-bottom: 1px solid #bfa76a;
+  background: linear-gradient(90deg, #3f4a4e 0%, #7d868b 100%);
+  border-radius: 8px 8px 0 0;
+}
+
+.fleet-management-header h3 {
+  margin: 0;
+  color: #e7e1c1;
+  font-family: 'Orbitron', Arial, sans-serif;
+  font-size: 1.05em;
+  font-weight: bold;
+}
+
+.fleet-management-content {
+  padding: 10px 12px;
+  max-height: calc(55vh - 48px);
+  overflow-y: auto;
+}
+
+.fleet-ships-section {
+  margin-bottom: 20px;
+}
+
+.fleet-ships-header {
+  color: #e7e1c1;
+  font-family: 'Orbitron', Arial, sans-serif;
+  font-weight: bold;
+  margin-bottom: 6px;
+  font-size: 0.85em;
+}
+
+.fleet-ships-list {
+  background: rgba(39, 49, 58, 0.6);
+  border: 1px solid #7d868b;
+  border-radius: 6px;
+  min-height: 160px;
+  padding: 6px;
+}
+
+.fleet-ship-item {
+  background: #27313a;
+  border: 1px solid #bfa76a;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  color: #e7e1c1;
+  font-family: 'Orbitron', Arial, sans-serif;
+  font-size: 0.82em;
+  cursor: grab;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fleet-ship-item:hover {
+  background: #3a4650;
+}
+
+.fleet-ship-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.fleet-ship-item.leader {
+  border-color: #d4af37;
+  background: linear-gradient(135deg, #27313a 0%, #3d3a2a 100%);
+}
+
+.fleet-ship-crown {
+  color: #d4af37;
+  font-size: 1.1em;
+  font-weight: bold;
+}
+
+.fleet-transfer-section {
+  margin-top: 20px;
+}
+
+.fleet-transfer-header {
+  color: #e7e1c1;
+  font-family: 'Orbitron', Arial, sans-serif;
+  font-weight: bold;
+  margin-bottom: 6px;
+  font-size: 0.85em;
+}
+
+.fleet-transfer-zone {
+  background: rgba(39, 49, 58, 0.4);
+  border: 2px dashed #7d868b;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  transition: all 0.2s;
+}
+
+.fleet-transfer-zone.collapsed {
+  height: 28px;
+  overflow: hidden;
+}
+
+.fleet-transfer-zone.expanded {
+  height: 64px;
+}
+
+.fleet-transfer-zone.drag-over {
+  border-color: #bfa76a;
+  background: rgba(191, 167, 106, 0.1);
+}
+
+.fleet-transfer-title {
+  padding: 8px 12px;
+  color: #e7e1c1;
+  font-family: 'Orbitron', Arial, sans-serif;
+  font-size: 0.85em;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.fleet-transfer-dropzone {
+  padding: 12px;
+  color: #7d868b;
+  font-size: 0.8em;
+  text-align: center;
+  font-style: italic;
+}
+
+.modal-main {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: space-between;
+  align-items: stretch;
+  padding: 24px 22px 0 22px;
+  gap: 28px;
+}
+
+.modal-cluster {
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #232c32 80%, #bfa76a22 100%);
+  border-radius: 18px;
+  border: 2px solid #7d868b;
+  box-shadow: 0 2px 16px #0005;
+  padding: 18px 18px 18px 18px;
+  min-width: 220px;
+  max-width: 340px;
+  min-height: 340px;
+  justify-content: flex-start;
+  align-items: stretch;
+}
+.left-cluster, .right-cluster {
+  width: 260px;
+}
+.center-cluster {
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 360px;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.formation-controls label {
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  color: #bfa76a;
+  font-size: 1.07em;
+  margin-bottom: 4px;
+  margin-top: 8px;
+}
+.formation-controls select {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 2px solid #bfa76a;
+  background: #232c32;
+  color: #e7e1c1;
+  font-size: 1em;
+  margin-bottom: 10px;
+}
+.small-compass {
+  width: 80px;
+  height: 80px;
+  background: radial-gradient(circle at 50% 50%, #7d868b 60%, #232c32 100%);
+  border: 2px solid #bfa76a;
+  border-radius: 50%;
+  margin: 10px auto 0 auto;
+  box-shadow: 0 0 8px #bfa76a88, 0 2px 8px #0006;
+  position: relative;
+}
+.detach-ship-btn {
+  margin-top: 18px;
+  background: #3f4a4e;
+  color: #e7e1c1;
+  border: 2px solid #bfa76a;
+  border-radius: 8px;
+  font-size: 1em;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.detach-ship-btn:active {
+  background: #bfa76a;
+  color: #232c32;
+}
+
+.fleet-heading-compass {
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle at 50% 50%, #bfa76a 0 6%, #232c32 60%, #7d868b 100%);
+  border: 4px solid #bfa76a;
+  border-radius: 50%;
+  margin: 0 auto 18px auto;
+  box-shadow: 0 0 16px #bfa76a88, 0 2px 16px #0008;
+  position: relative;
+}
+.speed-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 12px 0;
+}
+.speed-control label {
+  color: #bfa76a;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 1.01em;
+}
+.speed-slider {
+  width: 180px;
+  margin: 8px 0 4px 0;
+  accent-color: #bfa76a;
+}
+.speed-value {
+  color: #e7e1c1;
+  font-size: 1.09em;
+  margin-left: 6px;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  #navalDock .dock-panel { gap: 6px; }
+  #navalDock .group { gap: 6px; }
+  #navalDock .fleet-btn, #navalDock .tactical-map-btn, #navalDock .get-firing-solution-btn, #navalDock .fire-btn, #navalDock .smokescreen-btn, #navalDock .pause-btn {
+    padding: 6px 8px;
+    font-size: 0.9em;
+  }
+  #navalDock .speed-slider-dock { width: 120px; }
+  #navalDock .formation-select + .formation-select { margin-left: 4px; }
+}
+.movement-style-selector {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.movement-style-selector button {
+  background: #27313a;
+  color: #e7e1c1;
+  border: 2px solid #bfa76a;
+  border-radius: 8px;
+  font-size: 1em;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: background 0.13s, transform 0.08s;
+}
+.movement-style-selector button:active {
+  background: #bfa76a;
+  color: #27313a;
+  transform: scale(0.96);
+}
+
+.gunnery-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+.get-firing-solution-btn, .fire-btn {
+  background: #bfa76a;
+  color: #232c32;
+  border: 2.5px solid #27313a;
+  border-radius: 12px;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 1.19em;
+  padding: 11px 0;
+  margin-bottom: 6px;
+  box-shadow: 0 2px 0 #232c32, 0 4px 10px #0008;
+  letter-spacing: 1.2px;
+  transition: background 0.15s, transform 0.1s;
+  cursor: pointer;
+  position: relative;
+  text-shadow: 0 0 4px #fff8, 0 0 8px #bfa76a66;
+}
+/* Solution progress bar (no size/shape change) */
+#navalDock .get-firing-solution-btn { overflow: hidden; }
+#navalDock .get-firing-solution-btn .solution-progress {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 3px;
+  height: 4px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 2px;
+  display: none; /* visible only during calculation */
+}
+#navalDock .get-firing-solution-btn .solution-progress .bar {
+  height: 100%;
+  width: 0%;
+  background: #2bc84a; /* green */
+  border-radius: 2px;
+}
+.fire-btn.active {
+  background: #e33c1a;
+  color: #fff;
+  border: 3px solid #bfa76a;
+  box-shadow: 0 0 16px #e33c1a88, 0 2px 12px #0006;
+  font-weight: bold;
+  text-shadow: 0 0 8px #fff, 0 0 16px #e33c1a88;
+}
+.get-firing-solution-btn:active, .fire-btn:active {
+  background: #bfa76a;
+  color: #27313a;
+  transform: scale(0.97);
+}
+.gunnery-solution-display {
+  background: #232c32;
+  border: 2px solid #bfa76a;
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: #e7e1c1;
+  font-size: 1em;
+  margin-bottom: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.target-selector {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 2px solid #bfa76a;
+  background: #232c32;
+  color: #e7e1c1;
+  font-size: 1em;
+}
+.secondary-aa-toggle {
+  margin-top: 8px;
+  color: #bfa76a;
+  font-size: 0.97em;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+}
+
+.modal-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  background: linear-gradient(90deg, #232c32 0%, #7d868b 100%);
+  border-top: 3px solid #bfa76a;
+  padding: 13px 22px;
+  gap: 16px;
+}
+.modal-bottom-bar button {
+  background: #27313a;
+  color: #e7e1c1;
+  border: 2px solid #bfa76a;
+  border-radius: 9px;
+  font-size: 1.05em;
+  padding: 9px 18px;
+  cursor: pointer;
+  transition: background 0.13s, transform 0.08s;
+  margin-right: 6px;
+}
+.modal-bottom-bar button:active {
+  background: #bfa76a;
+  color: #27313a;
+  transform: scale(0.96);
+}
+
+.modal-env-awareness {
+  position: absolute;
+  top: 16px;
+  right: 32px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+  z-index: 150;
+}
+.wind-indicator {
+  background: #232c32;
+  border: 2px solid #bfa76a;
+  color: #e7e1c1;
+  border-radius: 7px;
+  padding: 6px 16px;
+  font-size: 1.04em;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  margin-right: 10px;
+}
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #232c32;
+  border: 2px solid #bfa76a;
+  border-radius: 7px;
+  padding: 5px 12px;
+}
+.zoom-controls button {
+  background: #bfa76a;
+  color: #232c32;
+  border: none;
+  border-radius: 4px;
+  font-size: 1.13em;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-weight: bold;
+  margin: 0 2px;
+}
+.fog-of-war-display {
+  background: repeating-linear-gradient(135deg, #232c32 0 6px, #7d868b 8px 12px);
+  border: 2px solid #bfa76a;
+  color: #e7e1c1;
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-size: 1em;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+}
+
+/* Rivet detail for modal border */
+#navalControlModal:before, #navalControlModal:after {
+  content: '';
+  position: absolute;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 4px #bfa76a inset,
+    0 0 0 12px #232c32 inset,
+    0 0 0 18px #bfa76a44 inset;
+}
+
+/* Compass rose placeholder */
+.fleet-heading-compass::after, .small-compass::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 90%; height: 90%;
+  transform: translate(-50%,-50%);
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="none" stroke="%23bfa76a" stroke-width="3"/><g stroke="%23bfa76a" stroke-width="2"><line x1="50" y1="8" x2="50" y2="92"/><line x1="8" y1="50" x2="92" y2="50"/></g><g stroke="%23bfa76a" stroke-width="1"><line x1="50" y1="20" x2="50" y2="80"/><line x1="20" y1="50" x2="80" y2="50"/></g></svg>') center/contain no-repeat;
+  opacity: 0.7;
+  z-index: 2;
+}
+
+/* End WWII Naval Modal Styling */
+
+/* Wind widget (top-right brass compass) */
+.wind-widget {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  width: 76px;
+  height: 76px;
+  pointer-events: none; /* display-only */
+  z-index: 20;
+}
+.wind-dial {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #3a3a3a 0%, #2b2b2b 60%, #1a1a1a 100%);
+  border: 2px solid #6e6240; /* brass rim */
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.5), 0 0 0 1px #1a1a1a;
+}
+.wind-dial::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 8px 12px rgba(0,0,0,0.35);
+}
+.wind-ticks {
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+  background:
+    conic-gradient(from 0deg,
+      rgba(191,167,106,0.5) 0deg 2deg, transparent 2deg 88deg,
+      rgba(191,167,106,0.5) 90deg 92deg, transparent 92deg 178deg,
+      rgba(191,167,106,0.5) 180deg 182deg, transparent 182deg 268deg,
+      rgba(191,167,106,0.5) 270deg 272deg, transparent 272deg 358deg
+    );
+}
+.wind-arrow {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 6px; height: 30px; /* brass shaft */
+  transform-origin: 50% 80%; /* rotate around a point near the base */
+  transform: translate(-50%, -50%) rotate(0deg);
+  background: linear-gradient(180deg, #e7e1c1, #9e8f5a);
+  border: 1px solid #5a4f2e;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(26,26,26,0.4);
+}
+.wind-arrow::after { /* arrow head */
+  content: '';
+  position: absolute;
+  left: 50%; top: -10px; /* sit on top of the shaft */
+  transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 14px solid #e7e1c1;
+  filter: drop-shadow(0 0 1px rgba(0,0,0,0.65));
+}
+.wind-arrow::before { /* tail feather: upside-down V */
+  content: '';
+  position: absolute;
+  left: 50%; bottom: -6px; /* attach near base */
+  transform: translateX(-50%);
+  width: 20px; height: 14px;
+  background:
+    linear-gradient(135deg, #e7e1c1 0 3px, transparent 0) left bottom / 50% 100% no-repeat,
+    linear-gradient(225deg, #e7e1c1 0 3px, transparent 0) right bottom / 50% 100% no-repeat;
+  filter: drop-shadow(0 0 1px rgba(0,0,0,0.65));
+}
+.wind-label {
+  position: absolute;
+  bottom: -14px; left: 48%;
+  transform: translateX(-50%);
+  color: #bfa76a;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.wind-label #windSpeedKts { display: inline; margin: 0; padding: 0; white-space: nowrap; }
+
+/* Wind dial cardinal letters */
+.wind-cardinal {
+  position: absolute;
+  color: #e7e1c1;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 11px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+.wind-cardinal.wind-n { top: 4px; left: 50%; transform: translateX(-50%); }
+.wind-cardinal.wind-s { bottom: 4px; left: 50%; transform: translateX(-50%); }
+.wind-cardinal.wind-e { right: 6px; top: 50%; transform: translateY(-50%); }
+.wind-cardinal.wind-w { left: 6px; top: 50%; transform: translateY(-50%); }
+
+/* Brass Mute Toggle placed just below wind widget */
+.mute-toggle {
+  position: fixed;
+  /* Place below dial + label (label sits 14px below dial) with 6px extra gap */
+  top: calc(10px + 76px + 14px + 6px);
+  /* Center under wind label (slightly left of dial center), approx +2px shift left */
+  right: calc(10px + (76px - 40px) / 2 + 2px);
+  width: 40px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 14px;
+  border: 2px solid #bfa76a;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.25), rgba(255,255,255,0) 40%),
+    linear-gradient(180deg, #d6c691 0%, #bda66e 45%, #9e8f5a 46%, #7c6f46 100%);
+  color: #232c32;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 0 4px #fff8, 0 0 8px #bfa76a66;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 2px 4px rgba(0,0,0,0.5), 0 0 0 1px rgba(26,26,26,0.4);
+  z-index: 21; /* above wind widget */
+  cursor: pointer;
+  pointer-events: auto; /* interactive */
+}
+.mute-toggle:active {
+  filter: brightness(0.95);
+  transform: translateY(1px);
+}
+.mute-toggle.muted {
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.2), rgba(0,0,0,0) 40%),
+    linear-gradient(180deg, #9b8a56 0%, #8a7a4a 45%, #6f623c 46%, #4e452b 100%);
+  color: #e7e1c1;
+}
+
+/* Compact Naval Control Dock */
+#navalDock.dock.naval-theme {
+  position: fixed;
+  left: var(--dock-left); bottom: var(--dock-bottom);
+  /* shrink to content width so map is visible on the right */
+  right: auto;
+  width: max-content;
+  max-width: 95vw; /* avoid overflowing very small screens */
+  display: block;
+  background: linear-gradient(180deg, #2a3238 0%, #1d2429 100%);
+  border-top: 3px solid #bfa76a;
+  border-right: 3px solid #bfa76a; /* brass trim on right edge */
+  box-shadow: 0 -6px 16px #0009;
+  padding: var(--dock-pad-y) var(--dock-pad-x);
+  height: var(--dock-height);
+  max-height: var(--dock-height);
+  box-sizing: border-box;
+  z-index: 5; /* above canvas, below HUD if needed */
+}
+
+#navalDock .dock-panel {
+  max-width: none;
+  margin: 0;
+  display: grid;                 /* grid for column alignment */
+  grid-template-columns: auto auto; /* left cluster | right cluster */
+  grid-auto-flow: row;
+  column-gap: var(--dock-col-gap);
+  row-gap: var(--dock-row-gap);
+  width: auto;
+}
+
+#navalDock .dock-row { display: contents; } /* flatten so child groups are grid items */
+/* Place items into grid columns by row and role */
+#navalDock .row-1 > .group:first-child { grid-column: 1; align-items: center; }
+#navalDock .row-1 > .gunnery-header { grid-column: 2; justify-self: start; }
+#navalDock .row-2 > .movement-area { grid-column: 1; }
+#navalDock .row-2 > .actions { grid-column: 2; }
+
+#navalDock .group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Small gaps between Fleet buttons and their info buttons in the first row */
+#navalDock .dock-panel .row-1 > .group {
+  gap: 3px;
+}
+
+#navalDock .gunnery-title-btn {
+  padding: 4px 10px;
+  font-size: 0.95em;
+}
+
+/* Small brass info button next to gunnery arrows */
+#navalDock .gunnery-info-btn {
+  background: #27313a;
+  color: #e7e1c1;
+  border: 2px solid #bfa76a;
+  border-radius: 8px;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.85em;
+  padding: 3px 8px;
+  line-height: 1;
+  cursor: pointer;
+  transition: none; /* avoid visual jump */
+}
+#navalDock .gunnery-info-btn:active { background: inherit; color: inherit; transform: none; }
+
+/* Small brass view (eye) button */
+#navalDock .gunnery-view-btn {
+  background: #27313a;
+  color: #e7e1c1;
+  border: 2px solid #bfa76a;
+  border-radius: 8px;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.85em;
+  padding: 3px 8px;
+  line-height: 1;
+  cursor: pointer;
+  transition: none; /* avoid visual jump */
+}
+#navalDock .gunnery-view-btn:active { background: inherit; color: inherit; transform: none; }
+
+#navalDock .fleet-btn,
+#navalDock .tactical-map-btn,
+#navalDock .smokescreen-btn,
+#navalDock .pause-btn,
+#navalDock .get-firing-solution-btn,
+#navalDock .fire-btn {
+  background: #27313a;
+  color: #e7e1c1;
+  border: 2px solid #bfa76a;
+  border-radius: 9px;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.95em;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background 0.13s, transform 0.08s;
+}
+#navalDock .fire-btn { background: #bfa76a; color: #232c32; font-weight: 700; }
+#navalDock .fire-btn.active { background: #e33c1a; color: #fff; border-color: #bfa76a; box-shadow: 0 0 12px #e33c1a88; }
+#navalDock .brass-selected {
+  /* Invert original button colors only; keep sizing identical */
+  background: #e7e1c1 !important; /* invert from dark naval */
+  color: #27313a !important;      /* dark text */
+  border-color: #bfa76a !important; /* keep same border thickness/color theme */
+  box-shadow: none !important;      /* no shadow change to avoid visual shift */
+}
+#navalDock button:active {
+  background: #bfa76a;
+  color: #27313a;
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Do not resize/reshape core dock buttons on press; keep colors stable */
+#navalDock .fleet-btn:active,
+#navalDock .tactical-map-btn:active,
+#navalDock .gunnery-title-btn:active {
+  background: inherit;
+  color: inherit;
+  transform: none;
+}
+
+#navalDock .formation-select,
+#navalDock .target-selector {
+  background: #232c32;
+  color: #e7e1c1;
+  border: 2px solid #bfa76a;
+  border-radius: 7px;
+  font-size: 0.95em;
+  padding: 4px 8px;
+}
+/* Grey out disabled options inside formation/pattern dropdowns */
+#navalDock .formation-select option:disabled {
+  color: #7d868b;
+}
+
+#navalDock .formation-label {
+  color: #bfa76a;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.9em;
+}
+
+#navalDock .pattern-label {
+  color: #bfa76a;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.9em;
+}
+
+#navalDock .speed-group label {
+  color: #bfa76a;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.9em;
+}
+/* Remove old speed slider styles */
+#navalDock .speed-readout {
+  color: #e7e1c1;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.95em;
+}
+
+#navalDock .readouts {
+  display: flex;
+  gap: 10px;
+  color: #e7e1c1;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.95em;
+}
+
+/* DOM Compass Widgets */
+#navalDock .compasses {
+  gap: 12px;
+}
+.compasses-left { display: flex; align-items: center; gap: 10px; }
+.selectors.stack { display: flex; flex-direction: column; gap: 4px; }
+.selectors.stack .stack-item { display: flex; flex-direction: column; gap: 2px; }
+.movement-area { display: flex; align-items: center; gap: 10px; }
+.group.actions { display: flex; flex-direction: row; gap: 15px; align-items: center; }
+
+/* Speed Slider */
+.speed-slider-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 10px;
+}
+
+.speed-label {
+  color: #bfa76a;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.9em;
+  margin-bottom: 5px;
+}
+
+.vertical-slider {
+  appearance: slider-vertical;
+  -webkit-appearance: slider-vertical;
+  width: 28px;
+  height: 76px; /* match compass height */
+  padding: 0 6px;
+  margin: 0 0;
+  background: transparent;
+}
+
+/* WebKit (Chrome/Edge/Safari) nautical styling */
+.vertical-slider::-webkit-slider-runnable-track {
+  width: 6px;
+  background: linear-gradient(180deg, #3a3a3a 0%, #2b2b2b 100%);
+  border: 1px solid #6e6240; /* brass rim */
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px #1a1a1a, inset 0 6px 8px rgba(0,0,0,0.35);
+}
+.vertical-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;           /* brass handle width */
+  height: 28px;          /* brass handle height */
+  border-radius: 6px;    /* rounded corners like a handle */
+  margin-top: -11px;     /* center the 28px thumb on ~6px track */
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 40%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.15) 0 2px, rgba(0,0,0,0) 2px 4px),
+    linear-gradient(180deg, #d6c691 0%, #bda66e 45%, #9e8f5a 46%, #7c6f46 100%);
+  border: 1px solid #5a4f2e;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 2px 4px rgba(0,0,0,0.5), 0 0 0 1px rgba(26,26,26,0.6);
+}
+.vertical-slider:focus { outline: none; }
+
+.vertical-slider:hover::-webkit-slider-thumb {
+  filter: brightness(1.05);
+}
+.vertical-slider:active::-webkit-slider-thumb {
+  filter: brightness(0.95);
+}
+
+/* Firefox */
+.vertical-slider::-moz-range-track {
+  width: 6px;
+  background: linear-gradient(180deg, #3a3a3a 0%, #2b2b2b 100%);
+  border: 1px solid #6e6240;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px #1a1a1a, inset 0 6px 8px rgba(0,0,0,0.35);
+}
+.vertical-slider::-moz-range-thumb {
+  width: 22px;
+  height: 28px;
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 40%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.15) 0 2px, rgba(0,0,0,0) 2px 4px),
+    linear-gradient(180deg, #d6c691 0%, #bda66e 45%, #9e8f5a 46%, #7c6f46 100%);
+  border: 1px solid #5a4f2e;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 2px 4px rgba(0,0,0,0.5), 0 0 0 1px rgba(26,26,26,0.6);
+}
+.vertical-slider:hover::-moz-range-thumb { filter: brightness(1.05); }
+.vertical-slider:active::-moz-range-thumb { filter: brightness(0.95); }
+
+/* Align slider container flush to compass, keep compact */
+.speed-slider-container {
+  align-items: center;
+  gap: 4px;
+}
+.speed-label, .speed-readout {
+  line-height: 1;
+}
+
+/* Rotated Speed Slider (cross-browser) */
+.speed-slider-wrap {
+  width: 28px;          /* visual thickness */
+  height: var(--compass-size);         /* match compass height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.speed-actual-indicator {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 3px;
+  background: #cbbd84; /* brass */
+  border: 1px solid #5a4f2e;
+  border-radius: 2px;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(26,26,26,0.3);
+}
+.speed-slider-rotated {
+  appearance: none;
+  width: var(--compass-size);          /* track length when rotated */
+  height: 28px;         /* visual thickness */
+  background: transparent;
+  transform: rotate(-90deg);
+}
+/* Track styling */
+.speed-slider-rotated::-webkit-slider-runnable-track {
+  height: 6px;
+  background: linear-gradient(180deg, #3a3a3a 0%, #2b2b2b 100%);
+  border: 1px solid #6e6240; /* brass rim */
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px #1a1a1a, inset 0 6px 8px rgba(0,0,0,0.35);
+}
+.speed-slider-rotated::-moz-range-track {
+  height: 6px;
+  background: linear-gradient(180deg, #3a3a3a 0%, #2b2b2b 100%);
+  border: 1px solid #6e6240; /* brass rim */
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px #1a1a1a, inset 0 6px 8px rgba(0,0,0,0.35);
+}
+/* Brass handle thumb */
+.speed-slider-rotated::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 28px;
+  border-radius: 6px;
+  margin-top: -11px; /* center on 6px track */
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 40%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.15) 0 2px, rgba(0,0,0,0) 2px 4px),
+    linear-gradient(180deg, #d6c691 0%, #bda66e 45%, #9e8f5a 46%, #7c6f46 100%);
+  border: 1px solid #5a4f2e;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 2px 4px rgba(0,0,0,0.5), 0 0 0 1px rgba(26,26,26,0.6);
+}
+.speed-slider-rotated::-moz-range-thumb {
+  width: 22px;
+  height: 28px;
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 40%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.15) 0 2px, rgba(0,0,0,0) 2px 4px),
+    linear-gradient(180deg, #d6c691 0%, #bda66e 45%, #9e8f5a 46%, #7c6f46 100%);
+  border: 1px solid #5a4f2e;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 2px 4px rgba(0,0,0,0.5), 0 0 0 1px rgba(26,26,26,0.6);
+}
+.speed-slider-rotated:hover::-webkit-slider-thumb { filter: brightness(1.05); }
+.speed-slider-rotated:active::-webkit-slider-thumb { filter: brightness(0.95); }
+.speed-slider-rotated:hover::-moz-range-thumb { filter: brightness(1.05); }
+.speed-slider-rotated:active::-moz-range-thumb { filter: brightness(0.95); }
+
+.speed-readout {
+  color: #bfa76a;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.9em;
+  margin-top: 5px;
+  text-align: center;
+  min-width: 50px;
+}
+.group.actions .gunnery-block { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.group.actions .solution-row { display: flex; align-items: stretch; gap: 10px; }
+/* Use the base gunnery-solution-display styling for accuracy panel with no overrides */
+#accuracyPanel.gunnery-solution-display {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  box-sizing: border-box; /* include border in height to match button height */
+  font-weight: 700; /* bold text inside accuracy panel */
+}
+
+/* Gunnery header arrows (small brass square buttons) */
+#navalDock .gunnery-header { align-items: stretch; }
+#navalDock .gunnery-arrow {
+  background: #27313a;
+  color: #e7e1c1;
+  border: 2px solid #bfa76a;
+  border-radius: 9px;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.95em; /* match dock button size */
+  font-weight: 700;
+  line-height: 1;   /* compact glyph line */
+  padding: 0;       /* rely on flex centering */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #232c32, 0 4px 10px #0008;
+  height: 100%;          /* stretch to row height (same as Gunnery button) */
+  aspect-ratio: 1 / 1;   /* square: width follows height */
+}
+#navalDock .gunnery-arrow:active {
+  background: #bfa76a;
+  color: #27313a;
+  transform: translateY(1px) scale(0.98);
+}
+/* Keep arrow buttons exactly the height of the Gunnery title button area on mobile too */
+@media (max-width: 768px) {
+  #navalDock .gunnery-arrow {
+    padding: 4px;
+    line-height: 1.2;
+  }
+}
+.compass-widget {
+  width: var(--compass-size);
+  height: var(--compass-size);
+  position: relative;
+  flex: 0 0 auto; /* don't shrink */
+}
+.compass-widget.large { width: 88px; height: 88px; }
+.compass-widget .dial {
+  width: 100%; height: 100%;
+  background: radial-gradient(circle at 50% 45%, #3b444a 0%, #232c32 70%);
+  border: 3px solid #bfa76a;
+  border-radius: 50%;
+  box-shadow: inset 0 0 12px #000a, 0 0 8px #0006;
+  position: relative;
+}
+.compass-widget .dial .label {
+  position: absolute;
+  left: 50%; top: calc(100% + 2px);
+  transform: translateX(-50%);
+  color: #e7e1c1;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.78em;
+}
+.compass-widget .ticks {
+  position: absolute;
+  left: 0; top: 0; right: 0; bottom: 0;
+}
+.compass-widget .tick {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 2px; height: 10px;
+  background: #bfa76a;
+  opacity: 0.9;
+}
+.compass-widget .needle {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 2px; height: 30px;
+  transform-origin: 50% 100%;
+  transform: translate(-50%, -100%) rotate(0deg);
+}
+.compass-widget .needle.actual {
+  background: #e33c1a;
+  box-shadow: 0 0 8px #e33c1a88;
+  z-index: 3;
+}
+.compass-widget .needle.planned {
+  background: #ffffff;
+  box-shadow: 0 0 6px rgba(255,255,255,0.6);
+  opacity: 0.95;
+  z-index: 2;
+}
+/* Center hub drawn on dial ensures the needle base is visually centered */
+.compass-widget .dial::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #bfa76a; border: 2px solid #232c32;
+  box-shadow: 0 0 6px #0008;
+}
+
+.compass-widget .deg {
+  position: absolute;
+  left: 50%; top: 50%;
+  color: #e7e1c1;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 9px;
+  line-height: 1;
+  pointer-events: none;
+  text-shadow: 0 1px 2px #000a;
+}
+
+#navalDock .movement-style-selector.compact button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  text-align: center;
+}
+
+#navalDock .secondary-aa-toggle {
+  color: #bfa76a;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+@media (max-width: 600px) {
+  /* Keep HUD (scoring + radio chatter) at top-right on mobile */
+  #hud {
+    top: 0;
+    right: 0;
+    left: auto;
+    bottom: auto;
+    width: auto;
+    max-width: 80vw;
+    padding: 12px 12px 12px 8px;
+    border: none;
+    font-size: 0.9em;
+  }
+
+  /* Ensure radio chatter box doesn't push layout horizontally */
+  #radio-chatter {
+    display: inline-block;
+    width: auto;
+    max-width: 140px; /* approx match the heading width on mobile */
+    max-height: 100px; /* half height */
+    padding: 3px; /* half padding */
+    font-size: 0.4rem; /* half font size */
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    margin-left: auto; /* keep aligned to the right edge */
+  }
+
+  /* Scale down radio title and messages on mobile */
+  #radio-title {
+    display: none; /* hide radio title on mobile */
+  }
+  .radio-message {
+    padding: 2px 4px;
+  }
+  #radio-messages { gap: 2px; }
+}
+
+/* Floating Debug Panel (top-left near zoom slider) */
+.debug-panel {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 22; /* above canvas and wind widget label/mute */
+  pointer-events: auto;
+}
+
+/* Global Debug HUD styles (when outside the dock) */
+.debug-panel .speed-debug {
+  background: #232c32;
+  border: 2px solid #bfa76a;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.55), inset 0 0 10px #0006;
+  padding: 0;
+  color: #e7e1c1;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  min-width: 240px;
+}
+.debug-panel .speed-debug > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 6px 10px;
+  background: linear-gradient(90deg, #232c32 0%, #7d868b 100%);
+  border-bottom: 2px solid #bfa76a;
+  border-radius: 8px 8px 0 0;
+  color: #e7e1c1;
+  user-select: none;
+}
+.debug-panel .speed-debug[open] > summary { border-radius: 8px 8px 0 0; }
+.debug-panel .speed-debug .speed-debug-body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 8px; }
+.debug-panel .speed-debug-section { background: #1d2429; border: 1px solid #7d868b; border-radius: 8px; padding: 0; }
+.debug-panel .speed-debug-section > summary { list-style: none; cursor: pointer; padding: 6px 10px; color: #bfa76a; font-weight: 700; user-select: none; }
+.debug-panel .speed-debug-section .speed-debug-section-body { padding: 6px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.debug-panel .dbg-row { display: grid; grid-template-columns: auto 1fr auto; column-gap: 8px; align-items: center; }
+.debug-panel .dbg-label { color: #bfa76a; font-size: 0.9em; }
+.debug-panel .dbg-value { color: #e7e1c1; font-size: 0.9em; }
+.debug-panel input[type="range"] { accent-color: #bfa76a; }
+
+@media (max-width: 768px) {
+  .debug-panel { top: 8px; left: 8px; }
+  .debug-panel .speed-debug { min-width: 210px; }
+  .debug-panel .speed-debug > summary { padding: 5px 8px; font-size: 0.95em; }
+}
+
+/* Radio Chatter Styling */
+#radio-title {
+  color: #0ff;
+  text-shadow: 0 0 6px #0ff, 0 0 18px #0ff, 0 0 32px #0ff;
+  margin: 20px 0 10px 0;
+  font-size: 1.1rem;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  letter-spacing: 1px;
+}
+
+#radio-chatter {
+  background: rgba(0,0,0,0.3);
+  border: 2px solid #0ff;
+  border-radius: 8px;
+  padding: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  width: auto;
+  max-width: 180px;
+  margin-left: auto;
+  z-index: -1;
+}
+
+#radio-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.radio-message {
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-left: 3px solid;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  animation: fadeIn 0.3s ease-in;
+}
+
+.radio-atc {
+  border-left-color: #00ffff;
+  color: #00ffff;
+  text-shadow: 0 0 4px #00ffff;
+}
+
+.radio-pilot {
+  border-left-color: var(--pilot-color);
+  color: var(--pilot-color);
+  text-shadow: 0 0 4px var(--pilot-color);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Scrollbar styling for radio chatter */
+#radio-chatter::-webkit-scrollbar {
+  width: 6px;
+}
+
+#radio-chatter::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+#radio-chatter::-webkit-scrollbar-thumb {
+  background: #0ff;
+  border-radius: 3px;
+}
+
+#radio-chatter::-webkit-scrollbar-thumb:hover {
+  background: #00cccc;
+}
+
+/* Pattern Options (compact panel) */
+#navalDock .pattern-options {
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: #232c32;
+  border: 2px solid #6e6240; /* brass rim */
+  border-radius: 8px;
+  box-shadow: inset 0 0 10px #0006;
+  display: none; /* toggled by JS */
+  max-width: 260px;
+}
+#navalDock .pattern-options.show { display: block; }
+#navalDock .pattern-options .opt-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+#navalDock .pattern-options .opt-label { color: #bfa76a; font-family: 'Orbitron', 'Arial', sans-serif; font-size: 0.85em; min-width: 84px; }
+#navalDock .pattern-options .opt-input { width: 90px; padding: 4px 6px; border-radius: 6px; border: 2px solid #bfa76a; background: #1d2429; color: #e7e1c1; font-size: 0.9em; }
+#navalDock .pattern-options .opt-unit { color: #9e8f5a; font-size: 0.85em; }
+/* Actions */
+#navalDock .pattern-options .opt-actions { justify-content: flex-start; }
+#navalDock .pattern-options .opt-btn {
+  background: #27313a;
+  color: #e7e1c1;
+  border: 2px solid #bfa76a;
+  border-radius: 7px;
+  padding: 4px 10px;
+  font-size: 0.9em;
+  cursor: pointer;
+  transition: background 0.13s, transform 0.08s;
+}
+#navalDock .pattern-options .opt-btn:active {
+  background: #bfa76a;
+  color: #27313a;
+  transform: translateY(1px) scale(0.98);
+}
+
+.compass-widget .needle {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 2px; height: 30px;
+  transform-origin: 50% 100%;
+  transform: translate(-50%, -100%) rotate(0deg);
+}
+.compass-widget .needle.actual {
+  background: #e33c1a;
+  box-shadow: 0 0 8px #e33c1a88;
+  z-index: 3;
+}
+.compass-widget .needle.planned {
+  background: #ffffff;
+  box-shadow: 0 0 6px rgba(255,255,255,0.6);
+  opacity: 0.95;
+  z-index: 2;
+}
+/* Center hub drawn on dial ensures the needle base is visually centered */
+.compass-widget .dial::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #bfa76a; border: 2px solid #232c32;
+  box-shadow: 0 0 6px #0008;
+}
+
+.compass-widget .deg {
+  position: absolute;
+  left: 50%; top: 50%;
+  color: #e7e1c1;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 9px;
+  line-height: 1;
+  pointer-events: none;
+  text-shadow: 0 1px 2px #000a;
+}
+
+#navalDock .movement-style-selector.compact button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  text-align: center;
+}
+
+#navalDock .secondary-aa-toggle {
+  color: #bfa76a;
+  font-family: 'Orbitron', 'Arial', sans-serif;
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+@media (max-width: 600px) {
+  /* Keep HUD (scoring + radio chatter) at top-right on mobile */
+  #hud {
+    top: 0;
+    right: 0;
+    left: auto;
+    bottom: auto;
+    width: auto;
+    max-width: 80vw;
+    padding: 12px 12px 12px 8px;
+    border: none;
+    font-size: 0.9em;
+  }
+
+  /* Ensure radio chatter box doesn't push layout horizontally */
+  #radio-chatter {
+    display: inline-block;
+    width: auto;
+    max-width: 140px; /* approx match the heading width on mobile */
+    max-height: 100px; /* half height */
+    padding: 3px; /* half padding */
+    font-size: 0.4rem; /* half font size */
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    margin-left: auto; /* keep aligned to the right edge */
+  }
+
+  /* Scale down radio title and messages on mobile */
+  #radio-title {
+    display: none; /* hide radio title on mobile */
+  }
+  .radio-message {
+    padding: 2px 4px;
+  }
+  #radio-messages { gap: 2px; }
+}

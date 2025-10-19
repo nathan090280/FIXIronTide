@@ -1,0 +1,81 @@
+{
+  "ship": {
+    "movement": {
+      "base_speed": 40,
+      "min_speed_knots": -8,
+      "max_speed_knots": 30,
+      "acceleration": {
+        "forward": 5,
+        "reverse": 3,
+        "neutral_zone": 0
+      },
+      "turning": {
+        "turn_rate_deg_per_sec": 10,
+        "rudder_effectiveness": {
+          "min_knots": 0,
+          "min_effectiveness": 0,
+          "max_knots": 30,
+          "max_effectiveness": 1.0,
+          "effectiveness_at_5kts": 0.1
+        },
+        "dead_zone_degrees": 0
+      },
+      "speed_stepping": {
+        "reverse_zone": [-8, -5],
+        "neutral_zone": 0,
+        "forward_zone": [5, 30],
+        "step_size": 1
+      }
+    },
+    "dimensions": {
+      "radius": 14,
+      "length": 250,
+      "beam": 36,
+      "draft": 10
+    },
+    "navigation": {
+      "dead_zone_radius": 100,
+      "waypoint_threshold": 10
+    },
+    "audio": {
+      "engine_loop": "engine_loop.mp3",
+      "splash_sounds": ["splash1.mp3", "splash2.mp3"],
+      "ambient_sounds": ["whales1.mp3", "seagulls1.mp3"],
+      "ambient_interval_seconds": 1200
+    },
+    "weapons": {
+      "main_battery": {
+        "count": 4,
+        "reload_time_seconds": 10,
+        "range_meters": 20000,
+        "shell_speed_mps": 800
+      },
+      "secondary_battery": {
+        "count": 8,
+        "reload_time_seconds": 5,
+        "range_meters": 5000,
+        "shell_speed_mps": 900
+      },
+      "anti_aircraft": {
+        "count": 2,
+        "range_meters": 4000,
+        "rate_of_fire_rpm": 120
+      }
+    },
+    "armor": {  ADD A VALUE FOR EACH HIT BOX EITHER STURDY OR
+      "belt_mm": 500,
+      "turrets_mm": 500
+    },
+    "propulsion": {
+      "engine_power_shp": 1000,
+      "max_speed_knots": 30,
+      "fuel_capacity_tons": 7400 NOT IN GAME YET
+    },
+    "crew": 2600,
+    "displacement_tons": 50900,
+    "notes": "Ship movement parameters are based on the in-game implementation. Some values like armor and weapon specs are based on historical battleship data and may not reflect exact in-game balance."
+  }
+}
+ADD STATS FOR 
+
+Flooding and anyhting else that the ship could experience except FUEL issues or pitch or roll,

@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="32" height="48" tilewidth="32" tileheight="32" infinite="0" nextlayerid="23" nextobjectid="34">
+ <layer id="1" name="tile layer 1" width="32" height="48">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <imagelayer id="2" name="b1" locked="1">
+  <image source="bismarck1.png" width="1024" height="1536"/>
+ </imagelayer>
+ <objectgroup id="3" name="turrets">
+  <object id="2" x="512.667" y="460.667">
+   <properties>
+    <property name="hitbox" type="bool" value="true"/>
+    <property name="t2" value="turret"/>
+   </properties>
+  </object>
+  <object id="3" x="512" y="351.333">
+   <properties>
+    <property name="hitbox" type="bool" value="true"/>
+    <property name="t1" value="turret"/>
+   </properties>
+  </object>
+  <object id="4" x="511.333" y="956">
+   <properties>
+    <property name="hitbox" type="bool" value="true"/>
+    <property name="t3" value="turret"/>
+   </properties>
+  </object>
+  <object id="5" x="510.667" y="1094.67">
+   <properties>
+    <property name="hitbox" type="bool" value="true"/>
+    <property name="t4" value="turret"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="22" name="prop">
+  <object id="33" x="509" y="1356" width="7.5" height="37.5">
+   <properties>
+    <property name="hitbox" type="bool" value="true"/>
+    <property name="prop" value="prop"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="7" name="bridge">
+  <object id="12" x="510.482" y="654.707">
+   <properties>
+    <property name="bridge" value="bridge"/>
+    <property name="hitbox" type="bool" value="true"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="16" name="damagecontrol1">
+  <object id="25" x="512" y="546">
+   <properties>
+    <property name="damagecontrol1" value="damagecontrol1"/>
+    <property name="hitbox" type="bool" value="true"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="17" name="damagecontrol2">
+  <object id="26" x="511" y="1129">
+   <properties>
+    <property name="damagecontrol2" value="damagecontrol2"/>
+    <property name="hitbox" type="bool" value="true"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="18" name="torpedotube1">
+  <properties>
+   <property name="hitbox" type="bool" value="true"/>
+   <property name="torpedotube1" value="torpedotube1"/>
+  </properties>
+ </objectgroup>
+ <objectgroup id="19" name="torpedotube2">
+  <properties>
+   <property name="hitbox" type="bool" value="true"/>
+   <property name="torpedotube2" value="torpedotube2"/>
+  </properties>
+ </objectgroup>
+ <objectgroup id="20" name="aa1">
+  <object id="27" x="509" y="312">
+   <properties>
+    <property name="aa1" value="aa1"/>
+    <property name="hitbox" type="bool" value="true"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="21" name="aa2">
+  <object id="28" x="511" y="1185">
+   <properties>
+    <property name="aa2" value="aa2"/>
+    <property name="hitbox" type="bool" value="true"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="8" name="bow">
+  <object id="13" x="510.482" y="68.3173">
+   <properties>
+    <property name="bow" value="bow"/>
+    <property name="hitbox" type="bool" value="true"/>
+   </properties>
+   <polygon points="0,0 36.0563,85.3966 -34.1586,87.2943"/>
+  </object>
+ </objectgroup>
+ <objectgroup id="9" name="engine">
+  <object id="14" x="497.198" y="867.25" width="28.4655" height="43.6471">
+   <properties>
+    <property name="engine" value="engine"/>
+    <property name="hitbox" type="bool" value="true"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="13" name="hullmid">
+  <object id="20" x="487" y="747" width="51" height="49">
+   <properties>
+    <property name="hitbox" type="bool" value="true"/>
+    <property name="hullmid" value="hullmid"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="14" name="hullaft1">
+  <object id="21" x="487" y="989" width="50" height="41">
+   <properties>
+    <property name="hitbox" type="bool" value="true"/>
+    <property name="hullaft1" value="hullaft1"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="15" name="hullaft2">
+  <object id="24" x="498.333" y="1236" width="30" height="66">
+   <properties>
+    <property name="hitbox" type="bool" value="true"/>
+    <property name="hullaft2" value="hullaft2"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="10" name="rangefinder">
+  <object id="17" x="492" y="594" width="41" height="34">
+   <properties>
+    <property name="hitbox" type="bool" value="true"/>
+    <property name="rangefinder" value="rangefinder"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="11" name="hullfore1">
+  <object id="18" x="498" y="229" width="24" height="67">
+   <properties>
+    <property name="hitbox" type="bool" value="true"/>
+    <property name="hullfore1" value="hullfore1"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="12" name="hullfore2">
+  <object id="19" x="496" y="383" width="34" height="46">
+   <properties>
+    <property name="hitbox" type="bool" value="true"/>
+    <property name="hullfore2" value="hullfore2"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="4" name="funnel">
+  <object id="9" x="510.482" y="717.331">
+   <properties>
+    <property name="funnel" value="funnel"/>
+    <property name="hitbox" type="bool" value="true"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="5" name="rudder">
+  <object id="10" x="510.482" y="1451.74">
+   <properties>
+    <property name="hitbox" type="bool" value="true"/>
+    <property name="rudder" value="rudder"/>
+   </properties>
+   <polygon points="0,0 17.0793,-37.954 -17.0793,-37.954"/>
+  </object>
+ </objectgroup>
+ <objectgroup id="6" name="magazine">
+  <object id="11" x="512.38" y="814.114">
+   <properties>
+    <property name="hitbox" type="bool" value="true"/>
+    <property name="magazine" value="magazine"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

@@ -1,0 +1,64 @@
+{
+  "name": "Battleship",
+  "class": "Battleship",
+  "type": "Warship",
+  "length_meters": 251.0,
+  "beam_meters": 36.0,
+  "draft_meters": 9.3,
+  "displacement_tons": 50900,
+  "crew": 2092,
+  "armament": {
+    "main_battery": {
+      "type": "8 × 38 cm (15 in) SK C/34",
+      "turrets": 4,
+      "guns_per_turret": 2,
+      "range_km": 35.5,
+      "shell_weight_kg": 800,
+      "rate_of_fire": 2.3,
+      "elevation_deg": {"min": -5, "max": 30}
+    },
+    "secondary_battery": {
+      "type": "12 × 15 cm (5.9 in) L/55",
+      "turrets": 6,
+      "guns_per_turret": 2,
+      "role": "Anti-surface/air",
+      "range_km": 23,
+      "rate_of_fire": 6
+    },
+    "anti_aircraft": {
+      "light_aa": "16 × 10.5 cm (4.1 in) L/65",
+      "medium_aa": "16 × 3.7 cm (1.5 in) L/83",
+      "light_aa": "12 × 2 cm (0.79 in) C/38"
+    }
+  },
+  "armor": {
+    "belt_mm": 320,
+    "deck_mm": 50,
+    "turrets_mm": 360,
+    "conning_tower_mm": 350
+  },
+  "propulsion": {
+    "engines": "12 × Wagner high-pressure steam boilers, 3 × Blohm & Voss steam turbines",
+    "power_hp": 150170,
+    "shafts": 3,
+    "speed_knots": 30.8,
+    "range_nm": 9280
+  },
+  "aviation": {
+    "aircraft": 4-6,
+    "facilities": "1 catapult"
+  },
+  "features": [
+    "Advanced fire control system",
+    "Torpedo bulges",
+    "Advanced radar systems",
+    "Heavy armor scheme",
+    "Long operational range"
+  ],
+  "notes": [
+    "Designed for long-range commerce raiding",
+    "One of the most powerful battleships ever built",
+    "Advanced damage control systems",
+    "Heavily armored against shellfire and torpedoes"
+  ]
+}

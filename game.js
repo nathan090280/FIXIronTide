@@ -14,9 +14,12 @@
   function fullyDespawnShipById(idStr, opts){
     try {
       const id = String(idStr||''); if (!id) return false;
+      console.log(`[DESPAWN] Starting despawn for ID: ${id}`);
       const res = (typeof window.resolveHandleByIdStrict === 'function') ? window.resolveHandleByIdStrict(id) : ((typeof window.resolveShipById === 'function') ? window.resolveShipById(id) : null);
       const handle = res && (res.handle || (res.state ? { state: res.state, profile: res.profile } : null));
       const st = handle && handle.state; const prof = handle && (handle.profile || st?.profile) || {};
+      console.log(`[DESPAWN] Resolved handle for ID ${id}:`, { hasHandle: !!handle, hasState: !!st, stateId: st?.id, displayName: st?.displayName, shipPos: st?.ship ? `(${st.ship.x}, ${st.ship.y})` : 'none' });
+      let fidPre = null;
       // Visual cue: prefer a one-shot explosion; avoid persistent funnel smoke that lingers
       if (opts && opts.emitSmoke && st && st.ship && Number.isFinite(st.ship.x) && Number.isFinite(st.ship.y)) {
         try { if (typeof spawnMightyExplosion === 'function') spawnMightyExplosion(st.ship.x, st.ship.y); } catch {}
@@ -25,22 +28,94 @@
       try { if (prof && typeof prof === 'object') { if ('image' in prof) prof.image = null; if (prof.damage && prof.damage.hitboxes) prof.damage.hitboxes = {}; if ('tmx' in prof) prof.tmx = null; } } catch {}
       try { if (handle && handle.damageModel) { handle.damageModel.profile = null; handle.damageModel.hitboxes = null; } } catch {}
       // Remove from ShipHandlesById
-      try { if (window.ShipHandlesById && id in window.ShipHandlesById) delete window.ShipHandlesById[id]; } catch {}
-      // Remove from arrays (exact ID match only)
-      try { if (Array.isArray(window.IronTideFleet)) window.IronTideFleet = window.IronTideFleet.filter(h => !(h && h.state && String(h.state.id) === id)); } catch {}
-      try { if (Array.isArray(window.NPCs)) window.NPCs = window.NPCs.filter(h => !(h && h.state && String(h.state.id) === id)); } catch {}
-      // Remove from enemy set and fleet assignments
-      try { if (window.EnemyFleet1 instanceof Set) window.EnemyFleet1.delete(id); } catch {}
+      try { 
+        if (window.ShipHandlesById && id in window.ShipHandlesById) {
+          console.log(`[DESPAWN] Removing ID ${id} from ShipHandlesById`);
+          delete window.ShipHandlesById[id];
+        }
+      } catch {}
+      // Remove from canonical fleet arrays (exact ID match only)
+      try { 
+        if (Array.isArray(window.Fleet1)) {
+          const before = window.Fleet1.length;
+          window.Fleet1 = window.Fleet1.filter(h => !(h && h.state && String(h.state.id) === id));
+          const after = window.Fleet1.length;
+          if (before !== after) console.log(`[DESPAWN] Removed ID ${id} from Fleet1 (${before} -> ${after})`);
+        }
+      } catch {}
+      try { 
+        if (Array.isArray(window.Fleet2)) {
+          const before = window.Fleet2.length;
+          window.Fleet2 = window.Fleet2.filter(h => !(h && h.state && String(h.state.id) === id));
+          const after = window.Fleet2.length;
+          if (before !== after) console.log(`[DESPAWN] Removed ID ${id} from Fleet2 (${before} -> ${after})`);
+        }
+      } catch {}
+      try { 
+        if (Array.isArray(window.Fleet3)) {
+          const before = window.Fleet3.length;
+          window.Fleet3 = window.Fleet3.filter(h => !(h && h.state && String(h.state.id) === id));
+          const after = window.Fleet3.length;
+          if (before !== after) console.log(`[DESPAWN] Removed ID ${id} from Fleet3 (${before} -> ${after})`);
+        }
+      } catch {}
+      try { if (Array.isArray(window.EnemyFleet1)) window.EnemyFleet1 = window.EnemyFleet1.filter(h => !(h && h.state && String(h.state.id) === id)); } catch {}
+      try { if (Array.isArray(window.EnemyFleet2)) window.EnemyFleet2 = window.EnemyFleet2.filter(h => !(h && h.state && String(h.state.id) === id)); } catch {}
+      try { if (Array.isArray(window.EnemyFleet3)) window.EnemyFleet3 = window.EnemyFleet3.filter(h => !(h && h.state && String(h.state.id) === id)); } catch {}
+      // Remove from legacy set and fleet assignments (set no longer used)
+      try { /* no-op: EnemyFleet1 Set removed */ } catch {}
       try {
+        try {
+          const m = window.IronTideFleetAssignments || window.fleetAssignments || window.fa;
+          [1,2,3].forEach(fid => { try { const set = m && m[fid]; if (!fidPre && set && typeof set.has === 'function' && set.has(id)) fidPre = fid; } catch {} });
+        } catch {}
         const maps = [window.IronTideFleetAssignments, window.fleetAssignments, window.fa];
         maps.forEach(m => { try { [1,2,3].forEach(fid => { const set = m && m[fid]; if (set && typeof set.delete === 'function') set.delete(id); }); } catch {} });
       } catch {}
       // Cleanup visual resources like smoke emitters
       try { cleanupShipResources(id, st && st.ship ? st.ship : null); } catch {}
+      try { if (fidPre) { if (typeof recomputeFormationLabels === 'function') recomputeFormationLabels(fidPre); } } catch {}
+      console.log(`[DESPAWN] Completed despawn for ID ${id}`);
       return true;
     } catch { return false; }
   }
   try { window.fullyDespawnShipById = fullyDespawnShipById; } catch {}
+
+  // Diagnostic: List all ships and their IDs across all registries
+  window.listAllShips = function(){
+    console.log('=== ALL SHIPS DIAGNOSTIC ===');
+    const playerId = (window.shipState && window.shipState.id != null) ? String(window.shipState.id) : '?';
+    console.log(`Player ID: ${playerId}, pos: (${ship?.x?.toFixed(1)}, ${ship?.y?.toFixed(1)}), sunk: ${!!(window.shipState?.sunk || window.shipState?.effects?.sunk)}`);
+    console.log('\nShipHandlesById:');
+    if (window.ShipHandlesById) {
+      Object.keys(window.ShipHandlesById).forEach(id => {
+        const h = window.ShipHandlesById[id];
+        console.log(`  ID ${id}: ${h?.state?.displayName || 'unnamed'}, pos: (${h?.state?.ship?.x?.toFixed(1)}, ${h?.state?.ship?.y?.toFixed(1)}), sunk: ${!!(h?.state?.sunk || h?.state?.effects?.sunk)}`);
+      });
+    }
+    console.log('\nIronTideFleet:');
+    if (Array.isArray(window.IronTideFleet)) {
+      window.IronTideFleet.forEach((h, i) => {
+        console.log(`  [${i}] ID ${h?.state?.id}: ${h?.state?.displayName || 'unnamed'}, pos: (${h?.state?.ship?.x?.toFixed(1)}, ${h?.state?.ship?.y?.toFixed(1)}), sunk: ${!!(h?.state?.sunk || h?.state?.effects?.sunk)}`);
+      });
+    }
+    console.log('\nFleet1:');
+    if (Array.isArray(window.Fleet1)) {
+      window.Fleet1.forEach((h, i) => {
+        console.log(`  [${i}] ID ${h?.state?.id}: ${h?.state?.displayName || 'unnamed'}, pos: (${h?.state?.ship?.x?.toFixed(1)}, ${h?.state?.ship?.y?.toFixed(1)}), sunk: ${!!(h?.state?.sunk || h?.state?.effects?.sunk)}`);
+      });
+    }
+    console.log('\nFleet Assignments:');
+    if (window.IronTideFleetAssignments) {
+      [1,2,3].forEach(fid => {
+        const set = window.IronTideFleetAssignments[fid];
+        if (set instanceof Set) {
+          console.log(`  Fleet ${fid}: [${Array.from(set).join(', ')}]`);
+        }
+      });
+    }
+    console.log('=== END DIAGNOSTIC ===');
+  };
 
   // === Target Leading Utilities ===
   // Track previous positions to estimate velocities (world units/sec)
@@ -77,12 +152,73 @@
     const mps = (kts||0) * 0.514444;
     return mps * getWuPerMeter();
   }
+
+  // --- Diagnostics: detect shared profile/damageModel objects across ships ---
+  function reportSharedObjects() {
+    try {
+      const ships = window.ShipHandlesById || window.shipFactory?.activeShips || window.ShipRegistry?.active || null;
+      if (!ships) {
+        console.warn('reportSharedObjects: no canonical ship store found (ShipHandlesById / shipFactory.activeShips / ShipRegistry.active missing)');
+        return;
+      }
+
+      // collect by object identity
+      const profileMap = new Map(); // obj -> [shipIds]
+      const dmMap      = new Map(); // obj -> [shipIds]
+      const keys = Object.keys(ships);
+      for (const k of keys) {
+        const h = ships[k];
+        if (!h) continue;
+        const prof = h.profile || h.state?.profile || (h.damageModel && h.damageModel.profile) || null;
+        const dm   = h.damageModel || null;
+
+        if (prof) {
+          const arr = profileMap.get(prof) || [];
+          arr.push(k);
+          profileMap.set(prof, arr);
+        }
+        if (dm) {
+          const arr2 = dmMap.get(dm) || [];
+          arr2.push(k);
+          dmMap.set(dm, arr2);
+        }
+      }
+
+      let found = false;
+      for (const [obj, ids] of profileMap.entries()) {
+        if (ids.length > 1) {
+          found = true;
+          console.warn('Shared PROFILE object used by ships:', ids);
+          console.log(obj);
+        }
+      }
+      for (const [obj, ids] of dmMap.entries()) {
+        if (ids.length > 1) {
+          found = true;
+          console.warn('Shared DAMAGE MODEL object used by ships:', ids);
+          console.log(obj);
+        }
+      }
+      if (!found) console.log('reportSharedObjects: no shared profile/damageModel objects found (good).');
+
+    } catch (e) {
+      console.error('reportSharedObjects failure', e);
+    }
+  }
+  try { window.reportSharedObjects = reportSharedObjects; } catch {}
   function resolveShipEntityById(id){
     const sid = String(id);
     try {
-      if (window.IronTideFleet && Array.isArray(window.IronTideFleet)) {
-        for (let i=0;i<window.IronTideFleet.length;i++){
-          const h = window.IronTideFleet[i];
+      const fleets = [];
+      try { if (Array.isArray(window.Fleet1)) fleets.push(...window.Fleet1); } catch {}
+      try { if (Array.isArray(window.Fleet2)) fleets.push(...window.Fleet2); } catch {}
+      try { if (Array.isArray(window.Fleet3)) fleets.push(...window.Fleet3); } catch {}
+      try { if (Array.isArray(window.EnemyFleet1)) fleets.push(...window.EnemyFleet1); } catch {}
+      try { if (Array.isArray(window.EnemyFleet2)) fleets.push(...window.EnemyFleet2); } catch {}
+      try { if (Array.isArray(window.EnemyFleet3)) fleets.push(...window.EnemyFleet3); } catch {}
+      if (fleets.length) {
+        for (let i=0;i<fleets.length;i++){
+          const h = fleets[i];
           if (h && h.state && String(h.state.id) === sid) {
             const sh = h.state.ship || {};
             return {
@@ -95,29 +231,27 @@
     try {
       const sid = String(idStr||''); if (!sid) return null;
       try { if (window.ShipHandlesById && window.ShipHandlesById[sid]) { const h = window.ShipHandlesById[sid]; return { state: h.state, profile: h.profile||h.state?.profile||null, handle: h }; } } catch {}
-      if (Array.isArray(window.IronTideFleet)) {
-        for (let i=0;i<window.IronTideFleet.length;i++){
-          const h = window.IronTideFleet[i]; if (h && h.state && String(h.state.id) === sid) return { state: h.state, profile: h.profile||h.state?.profile||null, handle: h };
-        }
-      }
-      if (Array.isArray(window.NPCs)) {
-        for (let i=0;i<window.NPCs.length;i++){
-          const n = window.NPCs[i]; if (n && n.state && String(n.state.id) === sid) return { state: n.state, profile: n.profile||n.state?.profile||n.damageModel?.profile||null, handle: n };
-        }
+      const fleets = [];
+      try { if (Array.isArray(window.Fleet1)) fleets.push(...window.Fleet1); } catch {}
+      try { if (Array.isArray(window.Fleet2)) fleets.push(...window.Fleet2); } catch {}
+      try { if (Array.isArray(window.Fleet3)) fleets.push(...window.Fleet3); } catch {}
+      try { if (Array.isArray(window.EnemyFleet1)) fleets.push(...window.EnemyFleet1); } catch {}
+      try { if (Array.isArray(window.EnemyFleet2)) fleets.push(...window.EnemyFleet2); } catch {}
+      try { if (Array.isArray(window.EnemyFleet3)) fleets.push(...window.EnemyFleet3); } catch {}
+      for (let i=0;i<fleets.length;i++){
+        const h = fleets[i]; if (h && h.state && String(h.state.id) === sid) return { state: h.state, profile: h.profile||h.state?.profile||null, handle: h };
       }
       return null;
     } catch { return null; }
   };
 
-  // Helper: get live hitboxes reference for a ship by ID
+  // Helper: get live hitboxes reference for a ship by ID (independent model only)
   window.getShipHitboxesById = function(idStr){
     try {
       const r = window.resolveHandleByIdStrict(idStr); if (!r) return null;
-      const h = r.handle, st = r.state, prof = r.profile;
+      const h = r.handle, st = r.state;
       if (h && h.damageModel && h.damageModel.hitboxes) return h.damageModel.hitboxes;
       if (st && st.damageModel && st.damageModel.hitboxes) return st.damageModel.hitboxes;
-      if (st && st.profile && st.profile.damage && st.profile.damage.hitboxes) return st.profile.damage.hitboxes;
-      if (prof && prof.damage && prof.damage.hitboxes) return prof.damage.hitboxes;
       return null;
     } catch { return null; }
   };
@@ -155,6 +289,46 @@
         }
         if (fid) promoteFleetLeaderIfSunk(fid);
       } catch {}
+      // Despawn/remove from active registries and retire ID
+      try { if (typeof window.shipSunk === 'function') window.shipSunk(r && (r.handle || r)); } catch {}
+      return true;
+    } catch { return false; }
+  };
+
+  // Unified despawn for a sunk ship. Does not touch any other ships.
+  window.shipSunk = function(ship){
+    try {
+      if (!ship) return false;
+      const handle = ship.handle || ship;
+      const st = handle && handle.state || ship.state || null;
+      if (!st) return false;
+      const idStr = String(st.id||'');
+      // Mark sunk flags
+      try { st.sunk = true; } catch {}
+      try { st.effects = st.effects || {}; st.effects.sunk = true; } catch {}
+      // Remove from active ship collections (canonical fleets)
+      try { if (Array.isArray(window.Fleet1)) window.Fleet1 = window.Fleet1.filter(h => !(h && h.state && String(h.state.id) === idStr)); } catch {}
+      try { if (Array.isArray(window.Fleet2)) window.Fleet2 = window.Fleet2.filter(h => !(h && h.state && String(h.state.id) === idStr)); } catch {}
+      try { if (Array.isArray(window.Fleet3)) window.Fleet3 = window.Fleet3.filter(h => !(h && h.state && String(h.state.id) === idStr)); } catch {}
+      try { if (Array.isArray(window.EnemyFleet1)) window.EnemyFleet1 = window.EnemyFleet1.filter(h => !(h && h.state && String(h.state.id) === idStr)); } catch {}
+      try { if (Array.isArray(window.EnemyFleet2)) window.EnemyFleet2 = window.EnemyFleet2.filter(h => !(h && h.state && String(h.state.id) === idStr)); } catch {}
+      try { if (Array.isArray(window.EnemyFleet3)) window.EnemyFleet3 = window.EnemyFleet3.filter(h => !(h && h.state && String(h.state.id) === idStr)); } catch {}
+      try { if (Array.isArray(window.activeShips)) window.activeShips = window.activeShips.filter(s => String((s && (s.id||s.state?.id))) !== idStr); } catch {}
+      // Unregister HUD for this ship only
+      try {
+        const hud = handle.hud || (window.HUDSystem && typeof window.HUDSystem.get === 'function' ? window.HUDSystem.get(idStr) : null);
+        if (hud && window.HUDSystem) {
+          if (typeof window.HUDSystem.remove === 'function') window.HUDSystem.remove(hud);
+          else if (typeof window.HUDSystem.unregister === 'function') window.HUDSystem.unregister(idStr);
+        }
+      } catch {}
+      // Retire ID to prevent reuse
+      try {
+        if (window.ShipRegistry && typeof window.ShipRegistry.onShipSunk === 'function') window.ShipRegistry.onShipSunk(idStr);
+        else if (window.ShipRegistry && typeof window.ShipRegistry.retireId === 'function') window.ShipRegistry.retireId(idStr);
+      } catch {}
+      // Remove direct handle mapping
+      try { if (window.ShipHandlesById) delete window.ShipHandlesById[idStr]; } catch {}
       return true;
     } catch { return false; }
   };
@@ -166,8 +340,8 @@
       const st = handle.state;
       // Skip if already sunk
       if (st.effects?.sunk || st.sunk) return;
-      // Prefer damageModel.hitboxes if present; else profile.damage.hitboxes
-      const dm = handle.damageModel && handle.damageModel.hitboxes ? handle.damageModel.hitboxes : (handle.profile && handle.profile.damage && handle.profile.damage.hitboxes ? handle.profile.damage.hitboxes : null);
+      // Use only independent model hitboxes
+      const dm = (handle.damageModel && handle.damageModel.hitboxes) ? handle.damageModel.hitboxes : (st && st.damageModel && st.damageModel.hitboxes ? st.damageModel.hitboxes : null);
       if (!dm) return;
       // Heuristic: detonate if any hitbox indicates magazine/ammos reaching 100%
       const keys = Object.keys(dm);
@@ -192,62 +366,46 @@
     } catch {}
   };
 
-  // Apply damage to ship by id in both profile and runtime damageModel (if present)
+  // Apply damage to ship by id (per-ship model only, no shared fallbacks)
   window.applyDamageToShipId = function(idStr, hitboxName, percent){
     try {
       const id = String(idStr||''); if (!id) return false;
       const v = Math.max(0, Math.min(100, Number(percent)||0));
       // Resolve strictly by ID
       let r = (typeof window.resolveShipById === 'function') ? window.resolveShipById(id) : null;
-      let st = r && r.state; let handle = r && r.handle; let prof = r && r.profile;
-      // If resolve returned player or mismatched id, try direct registries
+      let st = r && r.state; let handle = r && r.handle;
       if (!st || String(st.id) !== id) {
-        try { if (window.ShipHandlesById && window.ShipHandlesById[id]) { const h = window.ShipHandlesById[id]; r = { state: h.state, handle: h, profile: h.profile||h.state?.profile||null }; } } catch {}
-        if ((!r || !r.state) && Array.isArray(window.IronTideFleet)) {
-          for (const h of window.IronTideFleet) { if (h && h.state && String(h.state.id) === id) { r = { state: h.state, handle: h, profile: h.profile||h.state?.profile||null }; break; } }
+        try { if (window.ShipHandlesById && window.ShipHandlesById[id]) { const h = window.ShipHandlesById[id]; r = { state: h.state, handle: h }; } } catch {}
+        if (!r || !r.state) {
+          const fleets = [];
+          try { if (Array.isArray(window.Fleet1)) fleets.push(...window.Fleet1); } catch {}
+          try { if (Array.isArray(window.Fleet2)) fleets.push(...window.Fleet2); } catch {}
+          try { if (Array.isArray(window.Fleet3)) fleets.push(...window.Fleet3); } catch {}
+          try { if (Array.isArray(window.EnemyFleet1)) fleets.push(...window.EnemyFleet1); } catch {}
+          try { if (Array.isArray(window.EnemyFleet2)) fleets.push(...window.EnemyFleet2); } catch {}
+          try { if (Array.isArray(window.EnemyFleet3)) fleets.push(...window.EnemyFleet3); } catch {}
+          for (const h of fleets) { if (h && h.state && String(h.state.id) === id) { r = { state: h.state, handle: h }; break; } }
         }
-        if ((!r || !r.state) && Array.isArray(window.NPCs)) {
-          for (const n of window.NPCs) { if (n && n.state && String(n.state.id)===id) { r = { state: n.state, handle: n, profile: n.profile||n.state?.profile||n.damageModel?.profile||null }; break; } }
-        }
-        st = r && r.state; handle = r && r.handle; prof = r && r.profile;
+        st = r && r.state; handle = r && r.handle;
       }
       if (!st || String(st.id)!==id) return false;
       // Skip sunk
       if (st.effects?.sunk || st.sunk) return false;
-      // Ensure a live damageModel exists on handle for cruisers/others that missed initialization
-      try {
-        if (handle && (!handle.damageModel || !handle.damageModel.hitboxes)) {
-          const fallback = (st && st.profile && st.profile.damage && st.profile.damage.hitboxes) ? st.profile.damage.hitboxes : (prof && prof.damage && prof.damage.hitboxes ? prof.damage.hitboxes : null);
-          if (fallback) handle.damageModel = handle.damageModel || {}; handle.damageModel.hitboxes = handle.damageModel.hitboxes || fallback;
-        }
-      } catch {}
-      const setOn = (hitboxes)=>{
-        try {
-          if (!hitboxes || typeof hitboxes !== 'object') return;
-          const hb = hitboxes[hitboxName]; if (!hb) return;
-          hb.damage_percent = v;
-          if (typeof hb.max_hp === 'number' && hb.max_hp > 0) hb.hp = Math.max(0, Math.round((1 - v/100) * hb.max_hp));
-        } catch {}
-      };
-      // Apply to all plausible containers
-      try { if (handle && handle.damageModel && handle.damageModel.hitboxes) setOn(handle.damageModel.hitboxes); } catch {}
-      try { if (st && st.profile && st.profile.damage && st.profile.damage.hitboxes) setOn(st.profile.damage.hitboxes); } catch {}
-      try { if (prof && prof.damage && prof.damage.hitboxes) setOn(prof.damage.hitboxes); } catch {}
-      try { if (st && st.damageModel && st.damageModel.hitboxes) setOn(st.damageModel.hitboxes); } catch {}
-      // Run detonation check using a handle-like object
-      try { if (handle) window.checkCatastrophicDetonation(handle); else if (st) window.checkCatastrophicDetonation({ state: st, profile: prof, damageModel: st.damageModel||handle?.damageModel||null }); } catch {}
-      // If the exact edited hitbox name implies magazine/ammo and is at 100%, force detonation as a fallback
+      // Only mutate independent model
+      const dm = (handle && handle.damageModel && handle.damageModel.hitboxes) ? handle.damageModel.hitboxes : (st && st.damageModel && st.damageModel.hitboxes ? st.damageModel.hitboxes : null);
+      if (!dm) return false;
+      const hb = dm[hitboxName]; if (!hb) return false;
+      hb.damage_percent = v;
+      if (typeof hb.max_hp === 'number' && hb.max_hp > 0) hb.hp = Math.max(0, Math.round((1 - v/100) * hb.max_hp));
+      try { if (handle && handle.damageModel && typeof handle.damageModel.recomputeEffects === 'function') handle.damageModel.recomputeEffects(); } catch {}
+      // Detonation checks
+      try { if (handle) window.checkCatastrophicDetonation(handle); } catch {}
       try {
         const lowName = String(hitboxName||'').toLowerCase();
-        const nameMatch = /mag|ammo|ammun|powder|shell/.test(lowName);
-        if (nameMatch && v >= 100) {
-          if (window.VerboseLogs) console.log(`[DET-FORCE] Forcing detonation on ship ${id} due to ${hitboxName}=100%`);
-          // Ensure explosion SFX/FX
-          try {
-            const x = st.ship?.x, y = st.ship?.y;
-            if (typeof spawnMightyExplosion === 'function' && typeof x === 'number' && typeof y === 'number') spawnMightyExplosion(x, y);
-            if (typeof playExplodeSfx === 'function') playExplodeSfx(x, y);
-          } catch {}
+        if (/mag|ammo|ammun|powder|shell/.test(lowName) && v >= 100) {
+          const x = st.ship?.x, y = st.ship?.y;
+          try { if (typeof spawnMightyExplosion === 'function' && typeof x === 'number' && typeof y === 'number') spawnMightyExplosion(x, y); } catch {}
+          try { if (typeof playExplodeSfx === 'function') playExplodeSfx(x, y); } catch {}
           window.markShipSunkById(String(st.id));
         }
       } catch {}
@@ -259,16 +417,18 @@
       }
     } catch {}
     try {
-      if (Array.isArray(window.NPCs)) {
-        for (let i=0;i<window.NPCs.length;i++){
-          const n = window.NPCs[i];
-          if (n && n.state && String(n.state.id) === sid) {
-            const sh = n.state.ship || {};
-            return {
-              x: sh.x, y: sh.y, heading: sh.heading,
-              actualSpeedKts: n.state.actualSpeedKts, speedKts: n.state.speedKts
-            };
-          }
+      const fleets = [];
+      try { if (Array.isArray(window.EnemyFleet1)) fleets.push(...window.EnemyFleet1); } catch {}
+      try { if (Array.isArray(window.EnemyFleet2)) fleets.push(...window.EnemyFleet2); } catch {}
+      try { if (Array.isArray(window.EnemyFleet3)) fleets.push(...window.EnemyFleet3); } catch {}
+      for (let i=0;i<fleets.length;i++){
+        const n = fleets[i];
+        if (n && n.state && String(n.state.id) === sid) {
+          const sh = n.state.ship || {};
+          return {
+            x: sh.x, y: sh.y, heading: sh.heading,
+            actualSpeedKts: n.state.actualSpeedKts, speedKts: n.state.speedKts
+          };
         }
       }
     } catch {}
@@ -347,19 +507,21 @@
   function takeoverShipById(idStr) {
     try {
       if (!idStr) return false;
-      // Find handle by id in IronTideFleet
+      const prevPlayerId = (window.shipState && window.shipState.id != null) ? String(window.shipState.id) : '';
+      // Find handle by id in friendly fleets
       let h = null;
-      if (Array.isArray(window.IronTideFleet)) {
-        for (let i = 0; i < window.IronTideFleet.length; i++) {
-          const cand = window.IronTideFleet[i];
-          if (cand && cand.state && String(cand.state.id) === String(idStr)) { h = cand; break; }
-        }
+      const fleets = [];
+      try { if (Array.isArray(window.Fleet1)) fleets.push(...window.Fleet1); } catch {}
+      try { if (Array.isArray(window.Fleet2)) fleets.push(...window.Fleet2); } catch {}
+      try { if (Array.isArray(window.Fleet3)) fleets.push(...window.Fleet3); } catch {}
+      for (let i = 0; i < fleets.length; i++) {
+        const cand = fleets[i];
+        if (cand && cand.state && String(cand.state.id) === String(idStr)) { h = cand; break; }
       }
       if (!h || !h.state || !h.state.ship) return false;
       const id = String(h.state.id);
-      // Remove from NPC behavior list (but keep in IronTideFleet for rendering)
-      try { if (Array.isArray(window.NPCs)) window.NPCs = window.NPCs.filter(n => !(n && n.state && String(n.state.id) === id)); } catch {}
-      try { if (window.EnemyFleet1 instanceof Set) window.EnemyFleet1.delete(id); } catch {}
+      // Remove from enemy behavior lists if any (legacy)
+      try { /* no-op: EnemyFleet1 Set removed */ } catch {}
       // Ensure assigned to Fleet 1 for player control
       try {
         const fa = window.IronTideFleetAssignments || { 1:new Set(),2:new Set(),3:new Set() };
@@ -422,6 +584,50 @@
       try { window.PlayerDespawned = false; } catch {}
       // Enable follow
       try { window.viewFollow = window.viewFollow || { enabled:true, mode:'ship', shipId:id }; window.viewFollow.enabled = true; window.viewFollow.mode = 'ship'; window.viewFollow.shipId = id; } catch {}
+      // Update HUD mapping for new player id (keep left HUD hidden, only available via EYE cycle)
+      try {
+        if (window.ShipHUDs) {
+          const newKey = String(id);
+          // Prefer migrating existing left HUD mapping if present for previous player id
+          if (prevPlayerId && window.ShipHUDs[prevPlayerId]) {
+            const info = window.ShipHUDs[prevPlayerId];
+            // Move mapping
+            window.ShipHUDs[newKey] = Object.assign({}, info, { initialized: info.initialized === true, sunk: false });
+            try { delete window.ShipHUDs[prevPlayerId]; } catch {}
+            // Update dataset on container to new id but KEEP HIDDEN (left HUD not used)
+            const c = document.getElementById(info.containerId);
+            if (c) { try { c.dataset.shipId = newKey; } catch {} c.style.display = 'none'; }
+            // Ensure initialized
+            if (typeof initShipHudFor === 'function') {
+              try { initShipHudFor(info.containerId, info.canvasId); } catch {}
+              window.ShipHUDs[newKey].initialized = true;
+            }
+          } else if (!window.ShipHUDs[newKey]) {
+            // Fallback: register and init left HUD for this id if not present (keep hidden)
+            if (typeof window.registerHudForShip === 'function') {
+              window.registerHudForShip(newKey, 'shipHud', 'shipHudCanvas');
+              const info2 = window.ShipHUDs[newKey];
+              if (info2 && typeof initShipHudFor === 'function') {
+                try { initShipHudFor(info2.containerId, info2.canvasId); } catch {}
+                window.ShipHUDs[newKey].initialized = true;
+              }
+              try {
+                const c2 = document.getElementById(info2 && info2.containerId);
+                if (c2) { c2.dataset.shipId = newKey; c2.style.display = 'none'; }
+              } catch {}
+            }
+          } else {
+            // Mapping exists for newKey; ensure container points to newKey but KEEP HIDDEN
+            try {
+              const info = window.ShipHUDs[newKey];
+              const c = document.getElementById(info.containerId);
+              if (c) { c.dataset.shipId = newKey; c.style.display = 'none'; }
+              if (!info.initialized && typeof initShipHudFor === 'function') { initShipHudFor(info.containerId, info.canvasId); info.initialized = true; }
+              info.sunk = false;
+            } catch {}
+          }
+        }
+      } catch {}
       console.log(`[TAKEOVER] Promoted ship ${id} to player control`);
       return true;
     } catch { return false; }
@@ -444,9 +650,10 @@
       try { leader.state.effects = leader.state.effects || {}; leader.state.effects.sunk = true; } catch {}
       try { if (typeof leader.state.displayName === 'string' && !leader.state.displayName.includes('(SUNK)')) leader.state.displayName += ' (SUNK)'; } catch {}
       try { window.ShipHighlight = window.ShipHighlight || {}; window.ShipHighlight[sunkId] = false; } catch {}
-      try { if (window.EnemyFleet1 instanceof Set) window.EnemyFleet1.delete(sunkId); } catch {}
-      // Choose next alive ship in this fleet
+      try { /* no-op: EnemyFleet1 Set removed */ } catch {}
+      // Choose next alive ship in this fleet BEFORE despawning (to preserve order)
       const members = getFleetMembers(fid);
+      console.log(`[PROMOTE] Fleet ${fid} members before despawn:`, members);
       let nextId = null;
       for (let i = 0; i < members.length; i++) {
         const id = members[i];
@@ -455,6 +662,7 @@
         const h = getShipHandleById(id);
         if (h && h.state && !(h.state.effects?.sunk || h.state.sunk)) { nextId = id; break; }
       }
+      console.log(`[PROMOTE] Next leader for fleet ${fid}: ${nextId} (sunk: ${sunkId})`);
       // Despawn the sunk leader: remove images/TMX, emit funnel smoke, remove from registries and assignments
       try { fullyDespawnShipById(sunkId, { emitSmoke: true }); } catch {}
       if (!nextId) { return; }
@@ -491,19 +699,19 @@
       if (sid && playerId && sid === playerId) {
         return { profile: window.shipProfile, state: window.shipState, handle: null };
       }
-      if (Array.isArray(window.IronTideFleet)) {
-        for (let i=0;i<window.IronTideFleet.length;i++){
-          const h = window.IronTideFleet[i];
-          if (h && h.state && String(h.state.id) === sid) return { profile: h.profile, state: h.state, handle: h };
+      {
+        const fleets = [];
+        try { if (Array.isArray(window.Fleet1)) fleets.push(...window.Fleet1); } catch {}
+        try { if (Array.isArray(window.Fleet2)) fleets.push(...window.Fleet2); } catch {}
+        try { if (Array.isArray(window.Fleet3)) fleets.push(...window.Fleet3); } catch {}
+        try { if (Array.isArray(window.EnemyFleet1)) fleets.push(...window.EnemyFleet1); } catch {}
+        try { if (Array.isArray(window.EnemyFleet2)) fleets.push(...window.EnemyFleet2); } catch {}
+        try { if (Array.isArray(window.EnemyFleet3)) fleets.push(...window.EnemyFleet3); } catch {}
+        for (let i=0;i<fleets.length;i++){
+          const h = fleets[i];
+          if (h && h.state && String(h.state.id) === sid) return { profile: h.profile||h.damageModel?.profile||null, state: h.state, handle: h };
         }
-        // Trigger a redraw to reflect dashed animation direction immediately
         try { if (typeof requestAnimationFrame === 'function') requestAnimationFrame(()=>{}); } catch {}
-      }
-      if (Array.isArray(window.NPCs)) {
-        for (let i=0;i<window.NPCs.length;i++){
-          const n = window.NPCs[i];
-          if (n && n.state && String(n.state.id) === sid) return { profile: n.profile||n.damageModel?.profile||null, state: n.state, handle: n };
-        }
       }
     } catch {}
     return { profile: window.shipProfile, state: window.shipState, handle: null };
@@ -512,31 +720,36 @@
   // Apply repair to a profile's hitbox in a damage-model-friendly way
   window.applyRepairToProfile = function(profile, hitboxName, amount){
     try {
-      if (!profile || !profile.damage || !profile.damage.hitboxes) return;
-      const hb = profile.damage.hitboxes[hitboxName];
-      if (!hb) return;
+      // Deprecated: profile-based repairs can cause shared-state issues. Use applyRepairToShipId instead.
+      return false;
+    } catch {}
+  };
+
+  // Per-ship repair API: operate only on independent damage model for a given ship id
+  window.applyRepairToShipId = function(idStr, hitboxName, amount){
+    try {
+      const id = String(idStr||''); if (!id || !hitboxName) return false;
+      const hbs = (typeof window.getShipHitboxesById === 'function') ? window.getShipHitboxesById(id) : null;
+      if (!hbs) return false;
+      const hb = hbs[hitboxName]; if (!hb) return false;
       const max = (typeof hb.max_hp === 'number' && hb.max_hp > 0) ? hb.max_hp : (typeof hb.hp === 'number' ? Math.max(1, hb.hp) : 0);
-      if (!max || amount <= 0) return;
+      if (!max || amount <= 0) return false;
       if (typeof hb.hp !== 'number') hb.hp = max;
-      // Prefer repairing via percent if damage_percent exists to keep 100% -> 0% clear
       if (typeof hb.damage_percent === 'number' && isFinite(hb.damage_percent)) {
         const deltaP = (amount / max) * 100;
-        // Keep internal value with fractional precision for smooth accumulation; round only on display
         hb.damage_percent = Math.max(0, Math.min(100, hb.damage_percent - deltaP));
-        // Sync hp to percent for consistency (hp can be rounded to integer pixels)
         hb.hp = Math.max(0, Math.min(max, Math.round(max * (1 - hb.damage_percent/100))));
       } else {
-        // Repair directly in HP and derive percent
         hb.hp = Math.max(0, Math.min(max, hb.hp + amount));
         const hpP = Math.max(0, Math.min(1, hb.hp / max));
         hb.damage_percent = Math.max(0, Math.min(100, Math.round((1 - hpP) * 100)));
       }
-      // Extinguish and deflood when repaired below thresholds
       if (hb.damage_percent <= 50) {
         if (hb.on_fire) hb.on_fire = false;
         if (hb.floodable && typeof hb.flood_level === 'number') hb.flood_level = 0;
       }
-    } catch {}
+      return true;
+    } catch { return false; }
   };
 
   // Assign Damage Control team to a specific ship id and hitbox. team = 1 or 2.
@@ -547,9 +760,8 @@
       const idStr = String(shipId||'');
       if (!idStr) return false;
       // Validate that the target ship exists and has the hitbox
-      const tgt = window.resolveShipById(idStr) || {};
-      const prof = tgt.profile && tgt.profile.damage && tgt.profile.damage.hitboxes ? tgt.profile.damage.hitboxes : null;
-      if (!prof || !prof[hitboxName]) return false;
+      const prof = (typeof window.getShipHitboxesById === 'function') ? window.getShipHitboxesById(idStr) : null;
+      if (!prof || typeof prof !== 'object' || !prof[hitboxName]) return false;
       window.DamageControl['team'+teamNum] = hitboxName;
       window.DamageControl['team'+teamNum+'ShipId'] = idStr;
       return true;
@@ -643,18 +855,21 @@
       function setFleetHighlightsFor(fleetId){
         try {
           window.ShipHighlight = window.ShipHighlight || {};
-          const assign = window.IronTideFleetAssignments || {};
-          // Disable all highlights first
+          const assign = window.FleetAssignments || {};
+          // Disable all highlights first across all canonical fleets
           try {
-            if (Array.isArray(window.IronTideFleet)) {
-              window.IronTideFleet.forEach(h=>{ if (h && h.state) window.ShipHighlight[String(h.state.id)] = false; });
-            }
-            if (Array.isArray(window.NPCs)) {
-              window.NPCs.forEach(n=>{ if (n && n.state) window.ShipHighlight[String(n.state.id)] = false; });
-            }
+            const all = [];
+            try { if (Array.isArray(window.Fleet1)) all.push(...window.Fleet1); } catch {}
+            try { if (Array.isArray(window.Fleet2)) all.push(...window.Fleet2); } catch {}
+            try { if (Array.isArray(window.Fleet3)) all.push(...window.Fleet3); } catch {}
+            try { if (Array.isArray(window.EnemyFleet1)) all.push(...window.EnemyFleet1); } catch {}
+            try { if (Array.isArray(window.EnemyFleet2)) all.push(...window.EnemyFleet2); } catch {}
+            try { if (Array.isArray(window.EnemyFleet3)) all.push(...window.EnemyFleet3); } catch {}
+            all.forEach(h=>{ if (h && h.state) window.ShipHighlight[String(h.state.id)] = false; });
           } catch {}
           // Enable for target fleet
-          const set = assign[fleetId];
+          const key = (fleetId===1?'Fleet1':(fleetId===2?'Fleet2':(fleetId===3?'Fleet3':null)));
+          const set = key ? assign[key] : null;
           if (set instanceof Set) {
             set.forEach(id=>{ window.ShipHighlight[String(id)] = true; });
           }
@@ -682,8 +897,9 @@
         } catch {}
       }
 
-      const fa = window.IronTideFleetAssignments || {};
-      const hasShips = !!(fa[fid] instanceof Set && fa[fid].size > 0);
+      const fa = window.FleetAssignments || {};
+      const keyFA = (fid===1?'Fleet1':(fid===2?'Fleet2':(fid===3?'Fleet3':null)));
+      const hasShips = !!(keyFA && fa[keyFA] instanceof Set && fa[keyFA].size > 0);
       if (!hasShips) return;
 
       // Draw ONLY the fleet leader to avoid too many lines
@@ -1149,7 +1365,7 @@
             const byId = new Map(turretPoints.map(p => [p.id, p]));
             // Initialize destroyed flags map per NPC
             npc.state.turretDestroyedFlags = npc.state.turretDestroyedFlags || { turret1:false, turret2:false, turret3:false, turret4:false };
-            const hbMap = (npc.profile && npc.profile.damage && npc.profile.damage.hitboxes) ? npc.profile.damage.hitboxes : {};
+            const hbMap = (window.getShipHitboxesById && npc && npc.state && npc.state.id != null) ? (window.getShipHitboxesById(String(npc.state.id)) || {}) : {};
             ['t1','t2','t3','t4'].forEach(id => {
               const p = byId.get(id);
               if (!p) return;
@@ -1291,11 +1507,14 @@
         if (!ship || !ship.state || !ship.state.ship) continue;
         const shipId = String(ship.state.id);
         // Skip player ship (already drawn by drawShipWorld)
-        if (shipId === playerId) continue;
+        if (shipId === playerId) {
+          if (window.VerboseLogs) console.log(`[FRIENDLY-RENDER] Skipping player ship ID ${shipId} (drawn separately)`);
+          continue;
+        }
         // Skip sunk ships
-        try { if (ship.state && (ship.state.effects?.sunk || ship.state.sunk)) continue; } catch {}
+        try { if (ship.state && (ship.state.effects?.sunk || ship.state.sunk)) { if (window.VerboseLogs) console.log(`[FRIENDLY-RENDER] Skipping sunk ship ID ${shipId}`); continue; } } catch {}
         const st = ship.state.ship;
-        if (window.VerboseLogs) console.log(`[FRIENDLY-RENDER] Drawing ship ID ${shipId}, type: ${ship.profile?.type}, pos: (${st.x}, ${st.y}), image: ${ship.profile?.image}`);
+        if (window.VerboseLogs) console.log(`[FRIENDLY-RENDER] Drawing friendly ship ID ${shipId}, type: ${ship.profile?.type}, displayName: ${ship.state.displayName}, pos: (${st.x.toFixed(1)}, ${st.y.toFixed(1)}), image: ${ship.profile?.image}`);
         // Track velocity for lead calculations
         try { if (ship.state && ship.state.id != null) trackEntityVelocity(shipId, st.x, st.y); } catch {}
         // Determine per-ship image and aspect
@@ -1371,7 +1590,7 @@
             const turretH = Math.round(turretW / tAspect);
             const byId = new Map(turretPoints.map(p => [p.id, p]));
             ship.state.turretDestroyedFlags = ship.state.turretDestroyedFlags || { turret1:false, turret2:false, turret3:false, turret4:false };
-            const hbMap = (ship.profile && ship.profile.damage && ship.profile.damage.hitboxes) ? ship.profile.damage.hitboxes : {};
+            const hbMap = (window.getShipHitboxesById && ship && ship.state && ship.state.id != null) ? (window.getShipHitboxesById(String(ship.state.id)) || {}) : {};
             ['t1','t2','t3','t4'].forEach(id => {
               const p = byId.get(id);
               if (!p) return;
@@ -2615,7 +2834,9 @@
   // Draw ship in world coordinates using the world transform scale for consistent sizing
   function drawShipWorld() {
     // Skip drawing if player is sunk
-    try { if (window.shipState && (window.shipState.effects?.sunk || window.shipState.sunk)) return; } catch {}
+    try { if (window.shipState && (window.shipState.effects?.sunk || window.shipState.sunk)) { console.log('[DRAW-PLAYER] Skipping player draw - sunk'); return; } } catch {}
+    const playerId = (window.shipState && window.shipState.id != null) ? String(window.shipState.id) : '1';
+    if (window.VerboseLogs) console.log(`[DRAW-PLAYER] Drawing player ship ID ${playerId} at (${ship?.x}, ${ship?.y})`);
     const vr = currentViewRect || getViewRect();
     const scale = vr.scale;
     const targetHBase = 96;
@@ -2654,7 +2875,7 @@
     // Desktop behavior preserved (gunnery.enabled) - but only if player is in Fleet 1.
     // On touch devices, also render when placing/has target to help aiming.
     const isTouch = (typeof window !== 'undefined') && (('ontouchstart' in window) || (navigator && navigator.maxTouchPoints > 0));
-    const playerId = window.shipState && window.shipState.id != null ? String(window.shipState.id) : null;
+    // playerId already declared above at line 2836
     const playerInFleet1 = !!(playerId && window.IronTideFleetAssignments && window.IronTideFleetAssignments[1] && window.IronTideFleetAssignments[1].has(playerId));
     const desktopGate = playerInFleet1 && (typeof gunnery !== 'undefined' && gunnery && gunnery.enabled);
     const mobileGate = isTouch || (typeof gunneryFire !== 'undefined' && gunneryFire && gunneryFire.enabled) || (isTouch && ((firingSolution && (firingSolution.placing || firingSolution.target))));
@@ -6184,8 +6405,8 @@
           // Apply damage to a representative hitbox (approximate): hullmid
           try {
             const dmg = 120; // fixed damage per shell
-            if (npc1 && npc1.damageModel && npc1.profile && npc1.profile.damage) {
-              const hitboxes = npc1.profile.damage.hitboxes || {};
+            if (npc1 && npc1.damageModel) {
+              const hitboxes = (typeof window.getShipHitboxesById === 'function' && npc1.state && npc1.state.id != null) ? (window.getShipHitboxesById(String(npc1.state.id)) || {}) : {};
               const intact = Object.keys(hitboxes).filter(k => hitboxes[k] && !hitboxes[k].destroyed);
               function pickRandom(arr){ return (arr && arr.length) ? arr[Math.floor(Math.random()*arr.length)] : null; }
               // 50% chance to directly hit a discrete hitbox; else treat as hull impact with pass-through logic
@@ -6327,7 +6548,7 @@
             if (hd <= hitR) {
               try {
                 const dmg = 120;
-                const hitboxes = (en.profile && en.profile.damage && en.profile.damage.hitboxes) ? en.profile.damage.hitboxes : {};
+                const hitboxes = (typeof window.getShipHitboxesById === 'function' && en && en.state && en.state.id != null) ? (window.getShipHitboxesById(String(en.state.id)) || {}) : {};
                 const intact = Object.keys(hitboxes).filter(k => hitboxes[k] && !hitboxes[k].destroyed);
                 function pickRandom(arr){ return (arr && arr.length) ? arr[Math.floor(Math.random()*arr.length)] : null; }
                 if (Math.random() < 0.5) {
@@ -6394,7 +6615,7 @@
             if (hd <= hitR) {
               try {
                 const dmg = 100; // same as player hit from NPC shell
-                const hitboxes = (f.profile && f.profile.damage && f.profile.damage.hitboxes) ? f.profile.damage.hitboxes : {};
+                const hitboxes = (typeof window.getShipHitboxesById === 'function' && f && f.state && f.state.id != null) ? (window.getShipHitboxesById(String(f.state.id)) || {}) : {};
                 const intact = Object.keys(hitboxes).filter(k => hitboxes[k] && !hitboxes[k].destroyed);
                 function pickRandom(arr){ return (arr && arr.length) ? arr[Math.floor(Math.random()*arr.length)] : null; }
                 if (Math.random() < 0.5) {
@@ -7270,6 +7491,41 @@
     const mem = getFleetMembers(fleetId);
     return mem.length ? mem[0] : null;
   }
+  window.FleetFormationLabels = window.FleetFormationLabels || { 1: new Map(), 2: new Map(), 3: new Map() };
+  function recomputeFormationLabels(fid){
+    try {
+      const fleetId = Number(fid)||1;
+      const labels = new Map();
+      const members = (getFleetMembers(fleetId) || []).filter(id=>{ const h=getShipHandleById(id); return h && h.state && !(h.state.sunk||h.state?.effects?.sunk); });
+      if (!members.length) { window.FleetFormationLabels[fleetId] = labels; return; }
+      const leaderId = getFleetLeaderId(fleetId);
+      const leaderAlive = leaderId && members.includes(leaderId);
+      const order = [];
+      if (leaderAlive) order.push(leaderId);
+      for (const id of members) { if (id!==leaderId) order.push(id); }
+      const settings = (window.IronTideFleetSettings && window.IronTideFleetSettings[fleetId]) || {};
+      const fname = String(settings.formation||'Line Ahead').toLowerCase();
+      if (order.length){ labels.set(order[0], 'center'); }
+      if (fname.includes('double') && fname.includes('line') && fname.includes('ahead')){
+        let r=0; for (let i=1;i<order.length;i++){ const side=(i%2===1)?'port':'starboard'; const rank=Math.ceil((i)/2); labels.set(order[i], `${side}_aft_${rank}`); r++; }
+      } else if (fname.includes('line') && fname.includes('abreast')){
+        let L=0,R=0; for (let i=1;i<order.length;i++){ if (i%2===1){ R++; labels.set(order[i], `right_${R}`); } else { L++; labels.set(order[i], `left_${L}`); } }
+      } else if (fname.includes('echelon')){
+        const dir = (settings.echelonDirection||'left'); for (let i=1;i<order.length;i++){ labels.set(order[i], `${dir}_${i}`); }
+      } else if (fname.includes('wedge')){
+        let L=0,R=0; for (let i=1;i<order.length;i++){ if (i%2===1){ R++; labels.set(order[i], `right_${R}`);} else { L++; labels.set(order[i], `left_${L}`);} }
+      } else {
+        for (let i=1;i<order.length;i++){ labels.set(order[i], `aft_${i}`); }
+      }
+      window.FleetFormationLabels[fleetId] = labels;
+    } catch {}
+  }
+  window.getFormationSlotName = function(fleetId, shipId){
+    try { const m = window.FleetFormationLabels && window.FleetFormationLabels[Number(fleetId)||1]; if (!m) return ''; const v = m.get(String(shipId)); return v||''; } catch { return ''; }
+  };
+  window.getFormationLabels = function(fleetId){
+    try { const m = window.FleetFormationLabels && window.FleetFormationLabels[Number(fleetId)||1]; const obj={}; if (m){ for (const [k,v] of m.entries()) obj[k]=v; } return obj; } catch { return {}; }
+  };
   
   // Formation guidance for Echelon (diagonal / or \ formation)
   function updateFormationEchelon(dt, fleetId){
@@ -7655,12 +7911,13 @@
   // Helper: get the fleet leader ship object
   function getFleetLeader(fleetId) {
     try {
-      const fleetAssignments = window.IronTideFleetAssignments || {};
-      if (!fleetAssignments[fleetId]) return null;
+      // Get the first ship in the fleet by order (leader is always first in getFleetMembers)
+      const leaderId = getFleetLeaderId(fleetId);
+      if (!leaderId) return null;
       
-      // Check if player is in this fleet and return player as leader
+      // Check if it's the player
       const playerId = (window.shipState && window.shipState.id != null) ? String(window.shipState.id) : '1';
-      if (fleetAssignments[fleetId].has(playerId)) {
+      if (leaderId === playerId) {
         return {
           state: window.shipState,
           profile: window.shipProfile,
@@ -7668,16 +7925,10 @@
         };
       }
       
-      // Otherwise find first NPC in this fleet
-      if (Array.isArray(window.IronTideFleet)) {
-        for (let ship of window.IronTideFleet) {
-          if (ship && ship.state) {
-            const shipId = String(ship.state.id);
-            if (fleetAssignments[fleetId].has(shipId)) {
-              return ship;
-            }
-          }
-        }
+      // Otherwise find the ship handle by ID
+      const handle = getShipHandleById(leaderId);
+      if (handle && handle.state) {
+        return handle;
       }
       
       return null;
@@ -8195,9 +8446,13 @@
           const hudInfo = window.ShipHUDs[id];
           hudInfo.sunk = true;
           const container = document.getElementById(hudInfo.containerId);
-          if (container) container.style.display = 'none';
+          // Only act on the HUD whose dataset matches the target id
+          if (container) {
+            const dsid = (container.dataset && container.dataset.shipId) ? String(container.dataset.shipId) : '';
+            if (dsid === id) container.style.display = 'none';
+          }
         }
-        // Also hide any surrogate HUDs that map back to this id (e.g., right HUD entries with originalId)
+        // Also hide any surrogate HUDs that explicitly map back to this id (e.g., right HUD entries with originalId)
         if (window.ShipHUDs) {
           Object.keys(window.ShipHUDs).forEach(k => {
             try {
@@ -8205,7 +8460,11 @@
               if (info && info.originalId && String(info.originalId) === id) {
                 info.sunk = true;
                 const c = document.getElementById(info.containerId);
-                if (c) c.style.display = 'none';
+                if (c) {
+                  const dsid = (c.dataset && c.dataset.shipId) ? String(c.dataset.shipId) : '';
+                  // Surrogate should have dataset pointing to originalId; check before hiding
+                  if (dsid === id) c.style.display = 'none';
+                }
               }
             } catch {}
           });
@@ -8216,6 +8475,12 @@
         if (window.viewFollow && window.viewFollow.enabled && window.viewFollow.mode === 'ship' && String(window.viewFollow.shipId) === id) {
           window.viewFollow.enabled = false;
           camera.cx = ship.x; camera.cy = ship.y; currentViewRect = getViewRect();
+        }
+      } catch {}
+      // Unregister HUD mapping to fully detach references for this id only
+      try {
+        if (window.HUDSystem && typeof window.HUDSystem.unregister === 'function') {
+          window.HUDSystem.unregister(id);
         }
       } catch {}
       // Remove from legacy shipCycle lists if present
@@ -8700,7 +8965,7 @@
       // Destroyed check
       try {
         const hbKey = String(id).replace(/^t/, 'turret');
-        const hbMap = (npc1.profile && npc1.profile.damage && npc1.profile.damage.hitboxes) ? npc1.profile.damage.hitboxes : null;
+        const hbMap = (typeof window.getShipHitboxesById === 'function' && npc1 && npc1.state && npc1.state.id != null) ? (window.getShipHitboxesById(String(npc1.state.id)) || null) : null;
         if (hbMap && hbMap[hbKey]) {
           const hb = hbMap[hbKey];
           const maxhp = (typeof hb.max_hp === 'number') ? hb.max_hp : 0;
@@ -8771,7 +9036,7 @@
       // Destroyed check
       try {
         const hbKey = String(id).replace(/^t/, 'turret');
-        const hbMap = (npc.profile && npc.profile.damage && npc.profile.damage.hitboxes) ? npc.profile.damage.hitboxes : null;
+        const hbMap = (typeof window.getShipHitboxesById === 'function' && npc && npc.state && npc.state.id != null) ? (window.getShipHitboxesById(String(npc.state.id)) || null) : null;
         if (hbMap && hbMap[hbKey]) {
           const hb = hbMap[hbKey];
           const maxhp = (typeof hb.max_hp === 'number') ? hb.max_hp : 0;
@@ -12288,7 +12553,7 @@
         
         const fname = getSelectedFormationName(fleetId) || '';
         const lname = String(fname).toLowerCase();
-        console.log(`Fleet ${fleetId}: formation='${fname}', members=${fleetMembers.length}`);
+        if (window.VerboseLogs) console.log(`Fleet ${fleetId}: formation='${fname}', members=${fleetMembers.length}`);
         if (lname.includes('double') && lname.includes('line') && lname.includes('ahead')) {
           updateFormationDoubleLineAhead(dt, fleetId);
         } else if (lname.includes('line') && lname.includes('ahead')) {
@@ -13103,17 +13368,52 @@ rafHandle = requestAnimationFrame(gameLoop);
       }
       // Initialize Multi-HUD System - each ship gets its own HUD container
       window.ShipHUDs = window.ShipHUDs || {};
+      // Helper: create a unique HUD container and canvas per ship by cloning a base container
+      function createUniqueHudContainer(baseContainerId, baseCanvasId, shipId){
+        try {
+          const id = String(shipId);
+          const base = document.getElementById(baseContainerId);
+          if (!base) return { containerId: baseContainerId, canvasId: baseCanvasId, cloned: false };
+          // If already created for this ship, return existing ids
+          const existing = document.getElementById(`${baseContainerId}_${id}`);
+          if (existing) {
+            const existingCanvas = existing.querySelector('canvas') || document.getElementById(`${baseCanvasId}_${id}`);
+            const ecId = existingCanvas && existingCanvas.id ? existingCanvas.id : baseCanvasId;
+            return { containerId: existing.id, canvasId: ecId, cloned: true };
+          }
+          // Clone container
+          const clone = base.cloneNode(true);
+          clone.id = `${baseContainerId}_${id}`;
+          // Reset dataset and hide initially
+          try { clone.dataset.shipId = id; } catch {}
+          clone.style.display = 'none';
+          // Fix canvas id inside clone
+          let canvas = clone.querySelector('canvas');
+          if (canvas) {
+            canvas.id = `${baseCanvasId}_${id}`;
+          } else {
+            // If no canvas, create one to keep API consistent
+            canvas = document.createElement('canvas');
+            canvas.id = `${baseCanvasId}_${id}`;
+            clone.appendChild(canvas);
+          }
+          // Insert clone after base so CSS applies
+          base.parentNode && base.parentNode.insertBefore(clone, base.nextSibling);
+          return { containerId: clone.id, canvasId: canvas.id, cloned: true };
+        } catch { return { containerId: baseContainerId, canvasId: baseCanvasId, cloned: false }; }
+      }
       // Public API: register a ship HUD mapping so EYE/right HUD cycling can include it
       if (typeof window.registerHudForShip !== 'function') {
         window.registerHudForShip = function registerHudForShip(shipId, containerId, canvasId, opts){
           try {
             const id = String(shipId);
-            window.ShipHUDs[id] = Object.assign({ containerId, canvasId, initialized: false }, opts || {});
-            console.log('[HUD-REG]', id, '=>', containerId, '/', canvasId);
+            // Create per-ship unique container from base
+            const unique = createUniqueHudContainer(containerId, canvasId, id);
+            window.ShipHUDs[id] = Object.assign({ containerId: unique.containerId, canvasId: unique.canvasId, initialized: false }, opts || {});
+            console.log('[HUD-REG]', id, '=>', unique.containerId, '/', unique.canvasId, '(base:', containerId, '/', canvasId, ')');
           } catch (e) { console.warn('registerHudForShip failed for', shipId, e); }
         };
       }
-      
       // Backfill registration for any NPCs spawned before game.js loaded (e.g., transports)
       try {
         if (Array.isArray(window.NPCs)) {
@@ -13137,30 +13437,51 @@ rafHandle = requestAnimationFrame(gameLoop);
       
       // Pre-initialize HUDs for known ships
       if (playerId) {
-        window.ShipHUDs[playerId] = { containerId: 'shipHud', canvasId: 'shipHudCanvas', initialized: false };
+        (function(){
+          const uniq = createUniqueHudContainer('shipHud', 'shipHudCanvas', playerId);
+          window.ShipHUDs[playerId] = { containerId: uniq.containerId, canvasId: uniq.canvasId, initialized: false };
+          // Ensure dataset points to player id and pre-initialize the HUD so it exists at start
+          try {
+            const c = document.getElementById(uniq.containerId);
+            if (c) c.dataset.shipId = String(playerId);
+            if (typeof initShipHudFor === 'function') {
+              initShipHudFor(uniq.containerId, uniq.canvasId);
+              window.ShipHUDs[playerId].initialized = true;
+              // Keep left HUD hidden - player ship is only in EYE cycle (right HUD)
+              if (c) c.style.display = 'none';
+              console.log(`[HUD-INIT] Player HUD initialized (hidden, available in EYE cycle) for ID ${playerId}`);
+            }
+          } catch {}
+        })();
         console.log('Registered player HUD for ID:', playerId);
         
-        // ALSO register player for right HUD cycling (EYE button should include player ship)
-        // We'll create a separate entry for right HUD cycling
+        // Register player for right HUD cycling (EYE button) - this is the PRIMARY way to view player HUD
         const playerRightId = playerId + '_right';
-        window.ShipHUDs[playerRightId] = { containerId: 'shipHudRight', canvasId: 'shipHudCanvasRight', initialized: false, originalId: playerId };
-        console.log('Registered player for right HUD cycling with ID:', playerRightId);
+        (function(){
+          const uniq = createUniqueHudContainer('shipHudRight', 'shipHudCanvasRight', playerRightId);
+          window.ShipHUDs[playerRightId] = { containerId: uniq.containerId, canvasId: uniq.canvasId, initialized: false, originalId: playerId, isPlayerShip: true };
+        })();
+        console.log('Registered player for right HUD cycling (EYE) with ID:', playerRightId);
         
-        // Register in global handle registry for quick lookup
+        // Register in global handle registry for quick lookup (numeric IDs only)
         window.ShipHandlesById = window.ShipHandlesById || {};
         if (window.shipState) {
           const playerHandle = { state: window.shipState, profile: window.shipProfile };
           window.ShipHandlesById[playerId] = playerHandle;
-          window.ShipHandlesById[playerRightId] = playerHandle; // Same handle, different HUD
+          // Do NOT register alias IDs (e.g., `${playerId}_right`) to prevent shared object warnings
         }
       }
       if (npcId) {
-        window.ShipHUDs[npcId] = { containerId: 'shipHudRight', canvasId: 'shipHudCanvasRight', initialized: false };
+        (function(){
+          const uniq = createUniqueHudContainer('shipHudRight', 'shipHudCanvasRight', npcId);
+          window.ShipHUDs[npcId] = { containerId: uniq.containerId, canvasId: uniq.canvasId, initialized: false };
+        })();
         console.log('Registered NPC HUD for ID:', npcId);
         
         // Initialize Bismarck HUD at startup since it's visible
         try { 
-          initShipHudFor('shipHudRight', 'shipHudCanvasRight'); 
+          // Initialize using the unique ids for this NPC
+          initShipHudFor(window.ShipHUDs[npcId].containerId, window.ShipHUDs[npcId].canvasId); 
           window.ShipHUDs[npcId].initialized = true;
           console.log('Initialized Bismarck HUD at startup for ID:', npcId);
         } catch {}
@@ -13171,11 +13492,11 @@ rafHandle = requestAnimationFrame(gameLoop);
       
       window.showHudForShip = function(shipId) {
         try {
-          console.log('=== MULTI-HUD: Showing HUD for ship ID:', shipId);
+          if (window.VerboseLogs) console.log('=== MULTI-HUD: Showing HUD for ship ID:', shipId);
           
           // If already showing this ship's HUD, do nothing (prevent flashing)
           if (window.currentVisibleHudShipId === shipId) {
-            console.log('HUD already showing for ship ID:', shipId, '- skipping to prevent flash');
+            if (window.VerboseLogs) console.log('HUD already showing for ship ID:', shipId, '- skipping to prevent flash');
             return true;
           }
           
@@ -13183,11 +13504,12 @@ rafHandle = requestAnimationFrame(gameLoop);
           const playerId = (window.shipState && window.shipState.id != null) ? String(window.shipState.id) : '1';
           Object.keys(window.ShipHUDs).forEach(id => {
             if (id !== playerId) { // Don't hide player HUD
-              const hudInfo = window.ShipHUDs[id];
-              const container = document.getElementById(hudInfo.containerId);
-              if (container) {
-                container.style.display = 'none';
-                console.log('Hidden right HUD for ship ID:', id);
+              if (window.ShipHUDs[id] && window.ShipHUDs[id].containerId) {
+                const container = document.getElementById(window.ShipHUDs[id].containerId);
+                if (container && container.style.display !== 'none') {
+                  container.style.display = 'none';
+                  if (window.VerboseLogs) console.log('Hidden right HUD for ship ID:', id);
+                }
               }
             }
           });
@@ -13213,13 +13535,13 @@ rafHandle = requestAnimationFrame(gameLoop);
               
               // Initialize HUD if not already done
               if (!targetHud.initialized) {
-                console.log('Initializing HUD for ship ID:', shipId, 'display ID:', displayId);
+                if (window.VerboseLogs) console.log('Initializing HUD for ship ID:', shipId, 'display ID:', displayId);
                 initShipHudFor(targetHud.containerId, targetHud.canvasId);
                 targetHud.initialized = true;
               }
               
               window.currentVisibleHudShipId = shipId; // Track current HUD
-              console.log('Showed HUD for ship ID:', shipId, 'display ID:', displayId, 'using container:', targetHud.containerId);
+              if (window.VerboseLogs) console.log('Showed HUD for ship ID:', shipId, 'display ID:', displayId, 'using container:', targetHud.containerId);
               return true;
             }
           }
@@ -13234,8 +13556,9 @@ rafHandle = requestAnimationFrame(gameLoop);
       
       window.registerHudForShip = function(shipId, containerId, canvasId) {
         try {
-          window.ShipHUDs[shipId] = { containerId, canvasId, initialized: false };
-          console.log('Registered new HUD for ship ID:', shipId, 'container:', containerId);
+          const uniq = createUniqueHudContainer(containerId, canvasId, shipId);
+          window.ShipHUDs[shipId] = { containerId: uniq.containerId, canvasId: uniq.canvasId, initialized: false };
+          console.log('Registered new HUD for ship ID:', shipId, 'container:', uniq.containerId);
         } catch (e) {
           console.error('Error registering HUD for ship:', shipId, e);
         }
@@ -13276,7 +13599,7 @@ rafHandle = requestAnimationFrame(gameLoop);
         eyeBtn.__eyeBound__ = true;
         eyeBtn.addEventListener('click', ()=>{
           try {
-            console.log('=== EYE BUTTON: Right HUD Cycling ===');
+            if (window.VerboseLogs) console.log('=== EYE BUTTON: Right HUD Cycling ===');
             
             // Build cycle from RIGHT HUD ships only (strictly exclude player and any left-HUD proxies)
             const cycle = [];
@@ -13287,23 +13610,25 @@ rafHandle = requestAnimationFrame(gameLoop);
                 const hudInfo = window.ShipHUDs[shipId];
                 if (!hudInfo) return;
                 // Exclusions:
-                // - direct player id (left HUD entry)
+                // - direct player id (left HUD entry) BUT allow _right suffix entries
                 // - any HUD registered against the left container
-                // NOTE: allow right-HUD surrogate even if it points back to player via originalId
-                if (shipId === playerId) return;
-                if (hudInfo.containerId === 'shipHud') return;
+                if (shipId === playerId && !shipId.includes('_right')) return;
+                if (hudInfo.containerId && hudInfo.containerId.startsWith('shipHud_')) return; // left HUD clones
                 // Exclude HUDs marked sunk and ships whose state is sunk
                 try {
                   if (hudInfo.sunk) return;
-                  const h = window.ShipHandlesById && window.ShipHandlesById[shipId];
+                  // For _right entries, check the originalId
+                  const actualId = hudInfo.originalId || shipId;
+                  const h = window.ShipHandlesById && window.ShipHandlesById[actualId];
                   const sunk = !!(h && h.state && (h.state.effects?.sunk || h.state.sunk));
                   if (!h || sunk) return;
                 } catch {}
 
-                // Find ship position
+                // Find ship position (use originalId for _right entries)
                 let shipX = 0, shipY = 0;
                 try {
-                  const handle = window.ShipHandlesById && window.ShipHandlesById[shipId];
+                  const actualId = hudInfo.originalId || shipId;
+                  const handle = window.ShipHandlesById && window.ShipHandlesById[actualId];
                   if (handle && handle.state && handle.state.ship) {
                     shipX = handle.state.ship.x;
                     shipY = handle.state.ship.y;
@@ -13317,7 +13642,7 @@ rafHandle = requestAnimationFrame(gameLoop);
               });
             }
             
-            console.log('Eye cycle ships (right HUD only):', cycle.map(s => `${s.id}(${s.type})`));
+            if (window.VerboseLogs) console.log('Eye cycle ships (right HUD only):', cycle.map(s => `${s.id}(${s.type})`));
             
             // Maintain a dedicated cycle index for Eye
             window.viewCycleEye = window.viewCycleEye || { index: -1 };
@@ -13341,7 +13666,7 @@ rafHandle = requestAnimationFrame(gameLoop);
               window.viewCycleEye.index++;
               if (window.viewCycleEye.index >= cycle.length) {
                 // Close right HUD and disable follow
-                console.log('Eye cycling: closing right HUD');
+                if (window.VerboseLogs) console.log('Eye cycling: closing right HUD');
                 eyeBtn.classList.remove('brass-selected');
                 eyeBtn.setAttribute('aria-pressed','false');
                 window.viewFollow.enabled = false;
@@ -13364,7 +13689,7 @@ rafHandle = requestAnimationFrame(gameLoop);
             const currentShip = cycle[window.viewCycleEye.index];
             if (!currentShip) return;
             
-            console.log('Eye cycling to ship:', currentShip.id, 'type:', currentShip.type);
+            if (window.VerboseLogs) console.log('Eye cycling to ship:', currentShip.id, 'type:', currentShip.type);
             
             // Snap camera to ship and set up following
             camera.cx = currentShip.x; 
@@ -13380,7 +13705,7 @@ rafHandle = requestAnimationFrame(gameLoop);
             const followId = currentShip.id.endsWith('_right') ? currentShip.id.replace('_right', '') : currentShip.id;
             window.viewFollow.shipId = followId;
             
-            console.log('Camera following ship ID:', followId);
+            if (window.VerboseLogs) console.log('Camera following ship ID:', followId);
             
             // Show ship's HUD using multi-HUD system (right HUD only)
             window.showHudForShip(currentShip.id);

@@ -12,6 +12,103 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   } catch {}
 
+  // === HUDSystem setup ===
+  try {
+    if (!window.HUDSystem) {
+      window.HUDSystem = {
+        _huds: new Map(),
+
+        register(hud) {
+          try {
+            if (!hud || !hud.shipId) return false;
+
+            // Bind to DOM container via existing register function if present
+            if (typeof window.registerHudForShip === 'function' && hud.containerId && hud.canvasId) {
+              window.registerHudForShip(String(hud.shipId), hud.containerId, hud.canvasId);
+            }
+
+            this._huds.set(String(hud.shipId), hud);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+
+        get(shipId) {
+          return this._huds.get(String(shipId));
+        },
+
+        unregister(shipId) {
+          try {
+            const hud = this._huds.get(String(shipId));
+            if (hud) {
+              const el = document.getElementById(hud.containerId);
+              if (el) el.remove(); // remove DOM element
+              this._huds.delete(String(shipId));
+            }
+          } catch {}
+        },
+      };
+    }
+
+    // === HUD constructor ===
+    window.HUD = function (shipContainer) {
+      this.shipId = shipContainer.state.id;
+      const type = shipContainer.state.type || (shipContainer.profile && shipContainer.profile.type && String(shipContainer.profile.type).toLowerCase()) || '';
+
+      // Generate unique container IDs per ship
+      if (type === 'transport') {
+        this.containerId = `shipHudTransport_${this.shipId}`;
+        this.canvasId = `shipHudCanvasTransport_${this.shipId}`;
+      } else if (type === 'cruiser') {
+        this.containerId = `shipHudCruiser_${this.shipId}`;
+        this.canvasId = `shipHudCanvasCruiser_${this.shipId}`;
+      } else {
+        this.containerId = `shipHudRight_${this.shipId}`;
+        this.canvasId = `shipHudCanvasRight_${this.shipId}`;
+      }
+
+      // Create the DOM container if it doesn't exist
+      let container = document.getElementById(this.containerId);
+      if (!container) {
+        container = document.createElement('div');
+        container.id = this.containerId;
+        container.className = 'ship-hud';
+        try { container.dataset.shipId = String(this.shipId); } catch {}
+        document.body.appendChild(container);
+
+        // Create canvas inside container
+        const canvas = document.createElement('canvas');
+        canvas.id = this.canvasId;
+        container.appendChild(canvas);
+      }
+
+      this.container = container;
+      try { this.container.dataset.shipId = String(this.shipId); } catch {}
+      this.canvas = document.getElementById(this.canvasId);
+    };
+
+    // === When spawning a ship ===
+    window.spawnShip = function spawnShip(shipContainer) {
+      if (typeof window.HUD === 'function') {
+        shipContainer.hud = new window.HUD(shipContainer);
+        try {
+          if (window.HUDSystem && typeof window.HUDSystem.register === 'function') {
+            window.HUDSystem.register(shipContainer.hud);
+          }
+        } catch {}
+      }
+    };
+
+    // === When a ship sinks ===
+    window.despawnShip = function despawnShip(shipId) {
+      if (window.HUDSystem) {
+        window.HUDSystem.unregister(shipId);
+      }
+      // Other ship cleanup here...
+    };
+  } catch {}
+
 // --- Lightweight Ships Overlay Renderer (for new ship types like Transport) ---
 (function setupShipsOverlay(){
   try {
@@ -165,10 +262,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return { state: npc.state };
           }
           // Fallback: spawn a Battleship-like NPC by cloning the Bismarck profile
-          const baseProf = (window.shipProfile && typeof window.shipProfile === 'object') ? JSON.parse(JSON.stringify(window.shipProfile)) : {
+          const baseProf = (window.shipProfile && typeof window.shipProfile === 'object') ? structuredClone(window.shipProfile) : {
             name: 'Battleship', type: 'Battleship', dimensions: { length: 250, beam: 36, draft: 10, radius: 14 }, movement: { min_speed_knots: -8, max_speed_knots: 30, base_speed: 40, rudder_effectiveness: { effectiveness_at_5kts: 0.1 } }, armor: { belt_mm: 500, turrets_mm: 500 }
           };
-          // Build state
+          // Build independent state/profile and runtime systems
           const inst = { profile: baseProf, ship: { x, y, r: baseProf.dimensions.radius, heading, desiredHeading: heading, speed: baseProf.movement.base_speed * 0.5, moveTarget: null } };
           const state = {
             profile: baseProf,
@@ -188,14 +285,51 @@ document.addEventListener('DOMContentLoaded', () => {
           window.IronTideFleetNextId = (window.IronTideFleetNextId || 0) + 1;
           state.id = state.id || window.IronTideFleetNextId;
           const idx = window.IronTideFleetNextId;
+          // Build independent runtime systems and container
+          const shipPNG = 'assets/bismarck1.png';
+          const shipTMX = 'assets/BSTMX.tmx';
+          let damageModel = null;
+          let firingSolution = null;
+          try { if (typeof window.DamageModel === 'function') damageModel = new window.DamageModel(state); } catch {}
+          try { if (typeof window.FiringSolution === 'function' && damageModel) firingSolution = new window.FiringSolution(state, damageModel); } catch {}
+          const fleetName = (side === 'enemy') ? 'EnemyFleet1' : 'IronTideFleet';
+          const shipContainer = {
+            id: state.id,
+            profile: baseProf,
+            damageModel,
+            firingSolution,
+            png: shipPNG,
+            tmx: shipTMX,
+            fleet: fleetName,
+            state,
+          };
+
+          // Create and register per-ship HUD
+          try {
+            if (typeof window.HUD === 'function') {
+              shipContainer.hud = new window.HUD(shipContainer);
+              try { if (window.HUDSystem && typeof window.HUDSystem.register === 'function') window.HUDSystem.register(shipContainer.hud); } catch {}
+            }
+          } catch {}
+
           if (side === 'enemy') {
             state.displayName = `Enemy Battleship ${idx}`;
-            window.NPCs = window.NPCs || [];
-            window.NPCs.push({ state, profile: baseProf });
+            window.EnemyFleet1 = Array.isArray(window.EnemyFleet1) ? window.EnemyFleet1 : [];
+            window.EnemyFleet1.push(shipContainer);
+            try {
+              const idStr = String(state.id);
+              window.ShipHandlesById = window.ShipHandlesById || {};
+              window.ShipHandlesById[idStr] = shipContainer;
+            } catch {}
           } else {
             state.displayName = `Battleship ${idx}`;
-            window.IronTideFleet = window.IronTideFleet || [];
-            window.IronTideFleet.push({ state, profile: baseProf });
+            window.Fleet1 = Array.isArray(window.Fleet1) ? window.Fleet1 : [];
+            window.Fleet1.push(shipContainer);
+            try {
+              const idStr = String(state.id);
+              window.ShipHandlesById = window.ShipHandlesById || {};
+              window.ShipHandlesById[idStr] = shipContainer;
+            } catch {}
           }
           return { state };
         } catch { return null; }
@@ -207,8 +341,12 @@ document.addEventListener('DOMContentLoaded', () => {
       window.despawnNpcById = function despawnNpcById(id){
         try {
           const sid = String(id);
-          if (Array.isArray(window.NPCs)) window.NPCs = window.NPCs.filter(n => !(n && n.state && String(n.state.id) === sid));
-          if (Array.isArray(window.IronTideFleet)) window.IronTideFleet = window.IronTideFleet.filter(n => !(n && n.state && String(n.state.id) === sid));
+          if (Array.isArray(window.Fleet1)) window.Fleet1 = window.Fleet1.filter(n => !(n && n.state && String(n.state.id) === sid));
+          if (Array.isArray(window.Fleet2)) window.Fleet2 = window.Fleet2.filter(n => !(n && n.state && String(n.state.id) === sid));
+          if (Array.isArray(window.Fleet3)) window.Fleet3 = window.Fleet3.filter(n => !(n && n.state && String(n.state.id) === sid));
+          if (Array.isArray(window.EnemyFleet1)) window.EnemyFleet1 = window.EnemyFleet1.filter(n => !(n && n.state && String(n.state.id) === sid));
+          if (Array.isArray(window.EnemyFleet2)) window.EnemyFleet2 = window.EnemyFleet2.filter(n => !(n && n.state && String(n.state.id) === sid));
+          if (Array.isArray(window.EnemyFleet3)) window.EnemyFleet3 = window.EnemyFleet3.filter(n => !(n && n.state && String(n.state.id) === sid));
         } catch {}
       };
     }

@@ -353,8 +353,8 @@
         adjustSpeed: function(delta){ return this.setSpeedFromSlider(this.speedKts + delta); }
       };
       
-      // Attach profile and create damage model like spawnNpcAt
-      state.profile = JSON.parse(JSON.stringify(profile));
+      // Attach independent profile and create damage model like spawnNpcAt
+      state.profile = structuredClone(profile);
       
       console.log('=== TRANSPORT PROFILE ATTACHMENT ===');
       console.log('Original profile type:', profile.type);
@@ -365,68 +365,62 @@
       console.log('State profile tmx:', state.profile.tmx);
       let dm = null; 
       try { dm = new global.DamageModel(state); } catch {};
+      let fs = null;
+      try { if (typeof global.FiringSolution === 'function' && dm) fs = new global.FiringSolution(state, dm); } catch {}
+
+      // Build independent container aligned with start.js fallback
+      const shipPNG = state.profile?.image || 'assets/trans.png';
+      const shipTMX = state.profile?.tmx || state.profile?.hitboxFile || 'assets/transtmx.tmx';
+      const fleetName = (sideKey === 'enemy') ? 'EnemyFleet1' : 'Fleet1';
+      const shipContainer = {
+        id: state.id,
+        profile: state.profile,
+        damageModel: dm,
+        firingSolution: fs,
+        png: shipPNG,
+        tmx: shipTMX,
+        fleet: fleetName,
+        state,
+      };
+      // Create and register per-ship HUD
+      try {
+        if (typeof global.HUD === 'function') {
+          shipContainer.hud = new global.HUD(shipContainer);
+          try { if (global.HUDSystem && typeof global.HUDSystem.register === 'function') global.HUDSystem.register(shipContainer.hud); } catch {}
+        }
+      } catch {}
       
-      // Create NPC handle with damage model like spawnNpcAt
-      const npc = { state, profile: state.profile, damageModel: dm };
-      
-      // CRITICAL: Add to correct array based on side to prevent duplicates
-      // Friendly -> IronTideFleet only; Enemy -> NPCs only
+      // Add to canonical fleet arrays
       if (sideKey === 'enemy') {
-        global.NPCs = global.NPCs || [];
-        global.NPCs.push(npc);
+        global.EnemyFleet1 = Array.isArray(global.EnemyFleet1) ? global.EnemyFleet1 : [];
+        global.EnemyFleet1.push(shipContainer);
       } else {
-        global.IronTideFleet = global.IronTideFleet || [];
-        global.IronTideFleet.push(npc);
+        global.Fleet1 = Array.isArray(global.Fleet1) ? global.Fleet1 : [];
+        global.Fleet1.push(shipContainer);
       }
       
-      // Register in EnemyFleet1 when spawned as enemy so all targeting/damage systems recognize it
-      if (sideKey === 'enemy') {
-        const idStr = String(state.id);
-        global.EnemyFleet1 = global.EnemyFleet1 || new Set();
-        global.EnemyFleet1.add(idStr);
-      }
+      // No Set-based EnemyFleet registry; ShipHandlesById is sufficient
       
-      // FORCE friendly Transport into Fleet 1 using EXACT same pattern as spawnNpcAt
+      // Assign friendly Transport to Fleet 1 in canonical FleetAssignments
       if (sideKey === 'friendly') {
         const idStr = String(state.id);
-        global.IronTideFleetAssignments = global.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
-        [1,2,3].forEach(k=>{ if (!(global.IronTideFleetAssignments[k] instanceof Set)) global.IronTideFleetAssignments[k] = new Set(); });
-        global.IronTideFleetAssignments[2].delete(idStr);
-        global.IronTideFleetAssignments[3].delete(idStr);
-        global.IronTideFleetAssignments[1].add(idStr);
-        
-        // Also add to legacy fleet systems for compatibility
-        global.fa = global.fa || { 1: new Set(), 2: new Set(), 3: new Set() };
-        global.fleetAssignments = global.fleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
-        global.fleetMembers = global.fleetMembers || { 1: [], 2: [], 3: [] };
-        
-        global.fa[1].add(idStr);
-        global.fleetAssignments[1].add(idStr);
-        global.fleetMembers[1].push(npc);
-        
-        // Add to controllable ships
-        global.allShips = global.allShips || [];
-        global.allShips.push(npc);
-        
-        global.controllableShips = global.controllableShips || [];
-        global.controllableShips.push(npc);
-        
-        console.log('=== FRIENDLY TRANSPORT ADDED TO FLEET 1 ===');
-        console.log('Transport ID:', state.id, 'Name:', state.displayName);
-        console.log('Side:', state.side);
-        console.log('Added to IronTideFleetAssignments[1]:', global.IronTideFleetAssignments[1].has(idStr));
-        console.log('Added to fa[1]:', global.fa[1].has(idStr));
+        global.FleetAssignments = global.FleetAssignments || { Fleet1: new Set(), Fleet2: new Set(), Fleet3: new Set() };
+        ['Fleet1','Fleet2','Fleet3'].forEach(k=>{ if (!(global.FleetAssignments[k] instanceof Set)) global.FleetAssignments[k] = new Set(); });
+        global.FleetAssignments.Fleet2.delete(idStr);
+        global.FleetAssignments.Fleet3.delete(idStr);
+        global.FleetAssignments.Fleet1.add(idStr);
+        console.log('=== FRIENDLY TRANSPORT ADDED TO FleetAssignments.Fleet1 ===', idStr);
       }
       
       // Register globally
       global.ShipHandlesById = global.ShipHandlesById || {};
-      global.ShipHandlesById[String(state.id)] = npc;
+      global.ShipHandlesById[String(state.id)] = shipContainer;
       // Register in ShipPool for consistency with other ship types (helps generic queries)
       try {
         global.ShipPool = global.ShipPool || { friendly: { All: [], Battleship: [], Transport: [] }, enemy: { All: [], Battleship: [], Transport: [] } };
         const bucket = (sideKey === 'enemy') ? global.ShipPool.enemy : global.ShipPool.friendly;
-        if (!bucket.All.find(h => h && h.state && h.state.id === state.id)) bucket.All.push(npc);
-        if (!bucket.Transport.find(h => h && h.state && h.state.id === state.id)) bucket.Transport.push(npc);
+        if (!bucket.All.find(h => h && h.state && h.state.id === state.id)) bucket.All.push(shipContainer);
+        if (!bucket.Transport.find(h => h && h.state && h.state.id === state.id)) bucket.Transport.push(shipContainer);
       } catch {}
       
       // Increment counter for next spawn

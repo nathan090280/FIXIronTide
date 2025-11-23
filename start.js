@@ -119,8 +119,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function purgeRogueTransports(){
       try {
         const isUserPlaced = (h)=> !!(h && h.state && h.state.debugPlaced);
-        if (Array.isArray(window.IronTideFleet)) {
-          window.IronTideFleet = window.IronTideFleet.filter(h => {
+        if (Array.isArray(window.Fleet1)) {
+          window.Fleet1 = window.Fleet1.filter(h => {
+            const t = (h && (h.profile||h.state?.profile) && (h.profile||h.state?.profile).type) ? String((h.profile||h.state.profile).type).toLowerCase() : '';
+            return t !== 'transport' || isUserPlaced(h);
+          });
+        }
+        if (Array.isArray(window.Fleet2)) {
+          window.Fleet2 = window.Fleet2.filter(h => {
+            const t = (h && (h.profile||h.state?.profile) && (h.profile||h.state?.profile).type) ? String((h.profile||h.state.profile).type).toLowerCase() : '';
+            return t !== 'transport' || isUserPlaced(h);
+          });
+        }
+        if (Array.isArray(window.Fleet3)) {
+          window.Fleet3 = window.Fleet3.filter(h => {
             const t = (h && (h.profile||h.state?.profile) && (h.profile||h.state?.profile).type) ? String((h.profile||h.state.profile).type).toLowerCase() : '';
             return t !== 'transport' || isUserPlaced(h);
           });
@@ -232,8 +244,14 @@ document.addEventListener('DOMContentLoaded', () => {
       syncSize();
       octx.clearRect(0, 0, overlay.width, overlay.height);
       try {
-        if (Array.isArray(window.IronTideFleet)) {
-          for (let i=0;i<window.IronTideFleet.length;i++) drawShipHandle(window.IronTideFleet[i]);
+        if (Array.isArray(window.Fleet1)) {
+          for (let i=0;i<window.Fleet1.length;i++) drawShipHandle(window.Fleet1[i]);
+        }
+        if (Array.isArray(window.Fleet2)) {
+          for (let i=0;i<window.Fleet2.length;i++) drawShipHandle(window.Fleet2[i]);
+        }
+        if (Array.isArray(window.Fleet3)) {
+          for (let i=0;i<window.Fleet3.length;i++) drawShipHandle(window.Fleet3[i]);
         }
       } catch {}
       try {
@@ -282,9 +300,9 @@ document.addEventListener('DOMContentLoaded', () => {
             rudderEffectiveness: (k)=>{ const eff5 = (baseProf.movement.rudder_effectiveness && baseProf.movement.rudder_effectiveness.effectiveness_at_5kts) || 0.1; const t=Math.max(0,Math.min(1,(Math.abs(k)-5)/(30-5))); return (Math.abs(k)<=5)?(eff5*(Math.abs(k)/5)):(eff5+(1-eff5)*t); },
           };
           // Assign ID and push into correct collection
-          window.IronTideFleetNextId = (window.IronTideFleetNextId || 0) + 1;
-          state.id = state.id || window.IronTideFleetNextId;
-          const idx = window.IronTideFleetNextId;
+          window.NextShipId = (window.NextShipId || 0) + 1;
+          state.id = state.id || window.NextShipId;
+          const idx = window.NextShipId;
           // Build independent runtime systems and container
           const shipPNG = 'assets/bismarck1.png';
           const shipTMX = 'assets/BSTMX.tmx';
@@ -292,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
           let firingSolution = null;
           try { if (typeof window.DamageModel === 'function') damageModel = new window.DamageModel(state); } catch {}
           try { if (typeof window.FiringSolution === 'function' && damageModel) firingSolution = new window.FiringSolution(state, damageModel); } catch {}
-          const fleetName = (side === 'enemy') ? 'EnemyFleet1' : 'IronTideFleet';
+          const fleetName = (side === 'enemy') ? 'EnemyFleet1' : 'Fleet1';
           const shipContainer = {
             id: state.id,
             profile: baseProf,
@@ -433,7 +451,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const sid = String(id||'');
             // Prefer explicit membership in core arrays to avoid relying on transient sets/flags
             const isInNPCs = (()=>{ try { return Array.isArray(window.NPCs) && window.NPCs.some(h=> String(h?.state?.id||'')===sid); } catch { return false; } })();
-            const isInFleet = (()=>{ try { return Array.isArray(window.IronTideFleet) && window.IronTideFleet.some(h=> String(h?.state?.id||'')===sid); } catch { return false; } })();
+            const isInFleet = (()=>{ 
+              try { 
+                return (Array.isArray(window.Fleet1) && window.Fleet1.some(h=> String(h?.state?.id||'')===sid)) ||
+                       (Array.isArray(window.Fleet2) && window.Fleet2.some(h=> String(h?.state?.id||'')===sid)) ||
+                       (Array.isArray(window.Fleet3) && window.Fleet3.some(h=> String(h?.state?.id||'')===sid));
+              } catch { return false; } 
+            })();
             if (isInNPCs) return 'E';
             if (isInFleet) return 'F';
             let side = String(st?.side || '');
@@ -448,8 +472,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         // Friendly fleet entries (exclude sunk)
         try {
-          if (Array.isArray(window.IronTideFleet)) {
-            window.IronTideFleet.forEach(h => {
+          const allFleets = [];
+          if (Array.isArray(window.Fleet1)) allFleets.push(...window.Fleet1);
+          if (Array.isArray(window.Fleet2)) allFleets.push(...window.Fleet2);
+          if (Array.isArray(window.Fleet3)) allFleets.push(...window.Fleet3);
+          allFleets.forEach(h => {
               try {
                 const id = String(h?.state?.id ?? ''); if (!id) return;
                 const name = h?.state?.displayName || h?.profile?.name || 'Ship';
@@ -459,7 +486,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 pushIfNew(id, lab);
               } catch {}
             });
-          }
         } catch {}
         // Enemy entries (NPCs array, exclude sunk)
         try {
@@ -503,7 +529,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (sunk) return;
                 // Only include if this id corresponds to a live ship present in NPCs or IronTideFleet
                 const presentInNPCs = (()=>{ try { return Array.isArray(window.NPCs) && window.NPCs.some(n=> String(n?.state?.id||'')===sid && !(n?.state?.effects?.sunk || n?.state?.sunk)); } catch { return false; } })();
-                const presentInFleet = (()=>{ try { return Array.isArray(window.IronTideFleet) && window.IronTideFleet.some(f=> String(f?.state?.id||'')===sid && !(f?.state?.effects?.sunk || f?.state?.sunk)); } catch { return false; } })();
+                const presentInFleet = (()=>{ 
+                  try { 
+                    return (Array.isArray(window.Fleet1) && window.Fleet1.some(f=> String(f?.state?.id||'')===sid && !(f?.state?.effects?.sunk || f?.state?.sunk))) ||
+                           (Array.isArray(window.Fleet2) && window.Fleet2.some(f=> String(f?.state?.id||'')===sid && !(f?.state?.effects?.sunk || f?.state?.sunk))) ||
+                           (Array.isArray(window.Fleet3) && window.Fleet3.some(f=> String(f?.state?.id||'')===sid && !(f?.state?.effects?.sunk || f?.state?.sunk)));
+                  } catch { return false; } 
+                })();
                 if (!presentInNPCs && !presentInFleet) return; // avoid ghost/alias-only entries
                 const name = st.displayName || prof.name || 'Ship';
                 const side = sideHint(st, sid);
@@ -515,7 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch {}
         // IDs from assignment maps even if handle array not populated yet
         try {
-          const maps = [window.IronTideFleetAssignments, window.fleetAssignments, window.fa];
+          const maps = [window.FleetAssignments, window.fleetAssignments, window.fa];
           maps.forEach(m => {
             try {
               [1,2,3].forEach(fid => {
@@ -529,7 +561,13 @@ document.addEventListener('DOMContentLoaded', () => {
                       const sunk = !!(st?.effects?.sunk || st?.sunk); if (sunk) return;
                       // Only include if this id corresponds to a live ship present in NPCs or IronTideFleet
                       const presentInNPCs = (()=>{ try { return Array.isArray(window.NPCs) && window.NPCs.some(n=> String(n?.state?.id||'')===id && !(n?.state?.effects?.sunk || n?.state?.sunk)); } catch { return false; } })();
-                      const presentInFleet = (()=>{ try { return Array.isArray(window.IronTideFleet) && window.IronTideFleet.some(f=> String(f?.state?.id||'')===id && !(f?.state?.effects?.sunk || f?.state?.sunk)); } catch { return false; } })();
+                      const presentInFleet = (()=>{ 
+                        try { 
+                          return (Array.isArray(window.Fleet1) && window.Fleet1.some(f=> String(f?.state?.id||'')===id && !(f?.state?.effects?.sunk || f?.state?.sunk))) ||
+                                 (Array.isArray(window.Fleet2) && window.Fleet2.some(f=> String(f?.state?.id||'')===id && !(f?.state?.effects?.sunk || f?.state?.sunk))) ||
+                                 (Array.isArray(window.Fleet3) && window.Fleet3.some(f=> String(f?.state?.id||'')===id && !(f?.state?.effects?.sunk || f?.state?.sunk)));
+                        } catch { return false; } 
+                      })();
                       if (!presentInNPCs && !presentInFleet) return; // skip stale assignment-only ids
                       const name = st?.displayName || res?.profile?.name || 'Ship';
                       const side = sideHint(st, id);
@@ -662,7 +700,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!debugDetails || !debugDetails.open) return;
             // Build a lightweight signature of current ships to detect changes
             const ids = [];
-            try { if (Array.isArray(window.IronTideFleet)) window.IronTideFleet.forEach(h=>{ const id=String(h?.state?.id||''); const sunk=!!(h?.state?.effects?.sunk||h?.state?.sunk); if (id && !sunk) ids.push(id); }); } catch {}
+            try { 
+              if (Array.isArray(window.Fleet1)) window.Fleet1.forEach(h=>{ const id=String(h?.state?.id||''); const sunk=!!(h?.state?.effects?.sunk||h?.state?.sunk); if (id && !sunk) ids.push(id); });
+              if (Array.isArray(window.Fleet2)) window.Fleet2.forEach(h=>{ const id=String(h?.state?.id||''); const sunk=!!(h?.state?.effects?.sunk||h?.state?.sunk); if (id && !sunk) ids.push(id); });
+              if (Array.isArray(window.Fleet3)) window.Fleet3.forEach(h=>{ const id=String(h?.state?.id||''); const sunk=!!(h?.state?.effects?.sunk||h?.state?.sunk); if (id && !sunk) ids.push(id); });
+            } catch {}
             try { if (Array.isArray(window.NPCs)) window.NPCs.forEach(h=>{ const id=String(h?.state?.id||''); const sunk=!!(h?.state?.effects?.sunk||h?.state?.sunk); if (id && !sunk) ids.push(id); }); } catch {}
             try { if (window.ShipHandlesById) ids.push(...Object.keys(window.ShipHandlesById).filter(k=>/^[0-9]+$/.test(String(k)))); } catch {}
             ids.sort();

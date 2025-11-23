@@ -195,7 +195,7 @@
   // Audio: reuse engine/rest loop logic so transports have ambient sound
   (function setupAudio(){
     try {
-      const audio = global.IronTideAudio || {
+      const audio = global.GameAudio || {
         inited: false,
         muted: false,
         rest: null,
@@ -227,7 +227,7 @@
         },
       };
       try { setInterval(()=> audio.updateEngineMix(), 400); } catch {}
-      if (!global.IronTideAudio) global.IronTideAudio = audio;
+      if (!global.GameAudio) global.GameAudio = audio;
     } catch {}
   })();
 
@@ -329,7 +329,7 @@
       const strictAlloc = (typeof global.allocateStrictId === 'function') ? global.allocateStrictId : null;
       const assignedId = strictAlloc ? strictAlloc(sideKey, opts && opts.requestedId) : null;
       const state = {
-        id: (assignedId != null ? assignedId : (global.IronTideFleetNextId = (global.IronTideFleetNextId || 1) + 1)),
+        id: (assignedId != null ? assignedId : (global.NextShipId = (global.NextShipId || 1) + 1)),
         displayName,
         side: sideKey, // CRITICAL: Set side properly
         SPEED_MIN: profile.movement.min_speed_knots,
@@ -392,11 +392,16 @@
       
       // Add to canonical fleet arrays
       if (sideKey === 'enemy') {
+        // CRITICAL: Enemy ships must be added to NPCs array for rendering by drawAdditionalNpcs()
+        global.NPCs = global.NPCs || [];
+        global.NPCs.push(shipContainer);
         global.EnemyFleet1 = Array.isArray(global.EnemyFleet1) ? global.EnemyFleet1 : [];
         global.EnemyFleet1.push(shipContainer);
+        console.log(`[SPAWN-ENEMY] Added enemy Transport ID ${state.id} to NPCs and EnemyFleet1`);
       } else {
         global.Fleet1 = Array.isArray(global.Fleet1) ? global.Fleet1 : [];
         global.Fleet1.push(shipContainer);
+        console.log(`[SPAWN-FRIENDLY] Added friendly Transport ID ${state.id} to Fleet1`);
       }
       
       // No Set-based EnemyFleet registry; ShipHandlesById is sufficient
@@ -438,7 +443,7 @@
       console.log('Profile type:', state.profile?.type);
       console.log('Profile image:', state.profile?.image);
       
-      return npc;
+      return shipContainer;
     };
   } catch {}
 

@@ -194,7 +194,7 @@
   // Centralized Audio Manager for Prinz Eugen (reuse Bismarck's audio)
   (function setupAudio(){
     try {
-      const audio = global.IronTideAudio || {
+      const audio = global.GameAudio || {
         inited: false,
         muted: false,
         rest: null,
@@ -259,7 +259,7 @@
         }
       };
       try { setInterval(()=> audio.updateEngineMix(), 300); } catch {}
-      if (!global.IronTideAudio) global.IronTideAudio = audio;
+      if (!global.GameAudio) global.GameAudio = audio;
     } catch {}
   })();
 
@@ -283,7 +283,7 @@
       const strictAlloc = (typeof global.allocateStrictId === 'function') ? global.allocateStrictId : null;
       const assignedId = strictAlloc ? strictAlloc(sideKey, opts && opts.requestedId) : null;
       const state = {
-        id: (assignedId != null ? assignedId : (global.IronTideFleetNextId = (global.IronTideFleetNextId || 1) + 1)),
+        id: (assignedId != null ? assignedId : (global.NextShipId = (global.NextShipId || 1) + 1)),
         displayName,
         side: sideKey, // CRITICAL: Set side properly
         SPEED_MIN: profile.movement.min_speed_knots,
@@ -325,7 +325,7 @@
       // Build independent container aligned with other ship spawns
       const shipPNG = state.profile?.image || 'assets/prinz.png';
       const shipTMX = state.profile?.tmx || state.profile?.hitboxFile || 'assets/prinztmx.tmx';
-      const fleetName = (sideKey === 'enemy') ? 'EnemyFleet1' : 'IronTideFleet';
+      const fleetName = (sideKey === 'enemy') ? 'EnemyFleet1' : 'Fleet1';
       const shipContainer = {
         id: state.id,
         profile: state.profile,
@@ -337,13 +337,18 @@
         state,
       };
       
-      // Add to canonical fleet arrays only
+      // Add to canonical fleet arrays
       if (sideKey === 'enemy') {
+        // CRITICAL: Enemy ships must be added to NPCs array for rendering by drawAdditionalNpcs()
+        global.NPCs = global.NPCs || [];
+        global.NPCs.push(shipContainer);
         global.EnemyFleet1 = Array.isArray(global.EnemyFleet1) ? global.EnemyFleet1 : [];
         global.EnemyFleet1.push(shipContainer);
+        console.log(`[SPAWN-ENEMY] Added enemy Prinz Eugen ID ${state.id} to NPCs and EnemyFleet1`);
       } else {
         global.Fleet1 = Array.isArray(global.Fleet1) ? global.Fleet1 : [];
         global.Fleet1.push(shipContainer);
+        console.log(`[SPAWN-FRIENDLY] Added friendly Prinz Eugen ID ${state.id} to Fleet1`);
       }
       
       // No Set-based enemy registry needed

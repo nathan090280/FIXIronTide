@@ -14,11 +14,55 @@
   function fullyDespawnShipById(idStr, opts){
     try {
       const id = String(idStr||''); if (!id) return false;
-      console.log(`[DESPAWN] Starting despawn for ID: ${id}`);
-      const res = (typeof window.resolveHandleByIdStrict === 'function') ? window.resolveHandleByIdStrict(id) : ((typeof window.resolveShipById === 'function') ? window.resolveShipById(id) : null);
-      const handle = res && (res.handle || (res.state ? { state: res.state, profile: res.profile } : null));
-      const st = handle && handle.state; const prof = handle && (handle.profile || st?.profile) || {};
+      console.log(`[DESPAWN] ========== Starting despawn for ID: ${id} ==========`);
+      
+      // CRITICAL FIX: Search all arrays directly, don't use resolveShipById which checks player
+      let handle = null, st = null, prof = null;
+      
+      // First try ShipHandlesById
+      try {
+        if (window.ShipHandlesById && window.ShipHandlesById[id]) {
+          handle = window.ShipHandlesById[id];
+          st = handle.state;
+          prof = handle.profile || st?.profile || {};
+          console.log(`[DESPAWN] Found ship ID ${id} in ShipHandlesById`);
+        }
+      } catch {}
+      
+      // If not found, search all fleet arrays
+      if (!handle || !st) {
+        const allFleets = [];
+        try { if (Array.isArray(window.Fleet1)) allFleets.push(...window.Fleet1); } catch {}
+        try { if (Array.isArray(window.Fleet2)) allFleets.push(...window.Fleet2); } catch {}
+        try { if (Array.isArray(window.Fleet3)) allFleets.push(...window.Fleet3); } catch {}
+        try { if (Array.isArray(window.EnemyFleet1)) allFleets.push(...window.EnemyFleet1); } catch {}
+        try { if (Array.isArray(window.EnemyFleet2)) allFleets.push(...window.EnemyFleet2); } catch {}
+        try { if (Array.isArray(window.EnemyFleet3)) allFleets.push(...window.EnemyFleet3); } catch {}
+        
+        for (let i = 0; i < allFleets.length; i++) {
+          const h = allFleets[i];
+          if (h && h.state && String(h.state.id) === id) {
+            handle = h;
+            st = h.state;
+            prof = h.profile || st?.profile || {};
+            console.log(`[DESPAWN] Found ship ID ${id} in fleet arrays at index ${i}`);
+            break;
+          }
+        }
+      }
+      
       console.log(`[DESPAWN] Resolved handle for ID ${id}:`, { hasHandle: !!handle, hasState: !!st, stateId: st?.id, displayName: st?.displayName, shipPos: st?.ship ? `(${st.ship.x}, ${st.ship.y})` : 'none' });
+      
+      // CRITICAL: Verify we're despawning the correct ship
+      if (st && String(st.id) !== id) {
+        console.error(`[DESPAWN] ID MISMATCH! Requested ID ${id} but resolved to ID ${st.id}! ABORTING DESPAWN!`);
+        return false;
+      }
+      
+      if (!st) {
+        console.log(`[DESPAWN] Could not find ship ID ${id}, may already be despawned`);
+        // Continue with cleanup anyway to remove from arrays
+      }
       let fidPre = null;
       // Visual cue: prefer a one-shot explosion; avoid persistent funnel smoke that lingers
       if (opts && opts.emitSmoke && st && st.ship && Number.isFinite(st.ship.x) && Number.isFinite(st.ship.y)) {
@@ -66,11 +110,19 @@
       try { /* no-op: EnemyFleet1 Set removed */ } catch {}
       try {
         try {
-          const m = window.IronTideFleetAssignments || window.fleetAssignments || window.fa;
+          const m = window.FleetAssignments || window.fleetAssignments || window.fa;
           [1,2,3].forEach(fid => { try { const set = m && m[fid]; if (!fidPre && set && typeof set.has === 'function' && set.has(id)) fidPre = fid; } catch {} });
         } catch {}
-        const maps = [window.IronTideFleetAssignments, window.fleetAssignments, window.fa];
+        const maps = [window.FleetAssignments, window.fleetAssignments, window.fa];
         maps.forEach(m => { try { [1,2,3].forEach(fid => { const set = m && m[fid]; if (set && typeof set.delete === 'function') set.delete(id); }); } catch {} });
+      } catch {}
+      // CRITICAL: Clear npc1 if it matches this ID
+      try {
+        if (window.npc1 && window.npc1.state && String(window.npc1.state.id) === id) {
+          console.log(`[DESPAWN] Clearing window.npc1 (was ID ${id})`);
+          window.npc1 = null;
+          try { npc1 = null; } catch {}
+        }
       } catch {}
       // Cleanup visual resources like smoke emitters
       try { cleanupShipResources(id, st && st.ship ? st.ship : null); } catch {}
@@ -93,28 +145,88 @@
         console.log(`  ID ${id}: ${h?.state?.displayName || 'unnamed'}, pos: (${h?.state?.ship?.x?.toFixed(1)}, ${h?.state?.ship?.y?.toFixed(1)}), sunk: ${!!(h?.state?.sunk || h?.state?.effects?.sunk)}`);
       });
     }
-    console.log('\nIronTideFleet:');
-    if (Array.isArray(window.IronTideFleet)) {
-      window.IronTideFleet.forEach((h, i) => {
-        console.log(`  [${i}] ID ${h?.state?.id}: ${h?.state?.displayName || 'unnamed'}, pos: (${h?.state?.ship?.x?.toFixed(1)}, ${h?.state?.ship?.y?.toFixed(1)}), sunk: ${!!(h?.state?.sunk || h?.state?.effects?.sunk)}`);
-      });
-    }
     console.log('\nFleet1:');
     if (Array.isArray(window.Fleet1)) {
       window.Fleet1.forEach((h, i) => {
         console.log(`  [${i}] ID ${h?.state?.id}: ${h?.state?.displayName || 'unnamed'}, pos: (${h?.state?.ship?.x?.toFixed(1)}, ${h?.state?.ship?.y?.toFixed(1)}), sunk: ${!!(h?.state?.sunk || h?.state?.effects?.sunk)}`);
       });
     }
+    console.log('\nFleet2:');
+    if (Array.isArray(window.Fleet2)) {
+      window.Fleet2.forEach((h, i) => {
+        console.log(`  [${i}] ID ${h?.state?.id}: ${h?.state?.displayName || 'unnamed'}, pos: (${h?.state?.ship?.x?.toFixed(1)}, ${h?.state?.ship?.y?.toFixed(1)}), sunk: ${!!(h?.state?.sunk || h?.state?.effects?.sunk)}`);
+      });
+    }
+    console.log('\nFleet3:');
+    if (Array.isArray(window.Fleet3)) {
+      window.Fleet3.forEach((h, i) => {
+        console.log(`  [${i}] ID ${h?.state?.id}: ${h?.state?.displayName || 'unnamed'}, pos: (${h?.state?.ship?.x?.toFixed(1)}, ${h?.state?.ship?.y?.toFixed(1)}), sunk: ${!!(h?.state?.sunk || h?.state?.effects?.sunk)}`);
+      });
+    }
     console.log('\nFleet Assignments:');
-    if (window.IronTideFleetAssignments) {
+    if (window.FleetAssignments) {
       [1,2,3].forEach(fid => {
-        const set = window.IronTideFleetAssignments[fid];
+        const set = window.FleetAssignments[fid];
         if (set instanceof Set) {
           console.log(`  Fleet ${fid}: [${Array.from(set).join(', ')}]`);
         }
       });
     }
     console.log('=== END DIAGNOSTIC ===');
+  };
+
+  // Debug tool: Toggle formations on/off to isolate issues
+  window.toggleFormations = function(enable) {
+    if (enable === undefined) {
+      window.__FORMATIONS_DISABLED__ = !window.__FORMATIONS_DISABLED__;
+    } else {
+      window.__FORMATIONS_DISABLED__ = !enable;
+    }
+    console.log(`[DEBUG] Formations ${window.__FORMATIONS_DISABLED__ ? 'DISABLED' : 'ENABLED'}`);
+    return !window.__FORMATIONS_DISABLED__;
+  };
+
+  // Debug tool: Toggle HUDs on/off to isolate issues
+  window.toggleHUDs = function(enable) {
+    if (enable === undefined) {
+      window.__HUDS_DISABLED__ = !window.__HUDS_DISABLED__;
+    } else {
+      window.__HUDS_DISABLED__ = !enable;
+    }
+    const hudElements = ['shipHud', 'shipHudRight', 'shipHudTransport', 'shipHudCruiser', 'shipHudLeft'];
+    hudElements.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = window.__HUDS_DISABLED__ ? 'none' : '';
+    });
+    console.log(`[DEBUG] HUDs ${window.__HUDS_DISABLED__ ? 'DISABLED' : 'ENABLED'}`);
+    return !window.__HUDS_DISABLED__;
+  };
+
+  // Debug tool: Force clean up all sunk ships immediately
+  window.cleanupSunkShips = function() {
+    console.log('[DEBUG] Force cleaning up all sunk ships...');
+    let cleaned = 0;
+    const allShips = [];
+    try { if (Array.isArray(window.Fleet1)) allShips.push(...window.Fleet1); } catch {}
+    try { if (Array.isArray(window.Fleet2)) allShips.push(...window.Fleet2); } catch {}
+    try { if (Array.isArray(window.Fleet3)) allShips.push(...window.Fleet3); } catch {}
+    try { if (Array.isArray(window.EnemyFleet1)) allShips.push(...window.EnemyFleet1); } catch {}
+    try { if (Array.isArray(window.EnemyFleet2)) allShips.push(...window.EnemyFleet2); } catch {}
+    try { if (Array.isArray(window.EnemyFleet3)) allShips.push(...window.EnemyFleet3); } catch {}
+    const seen = new Set();
+    allShips.forEach(h => {
+      if (!h || !h.state) return;
+      const id = String(h.state.id);
+      if (seen.has(id)) return;
+      seen.add(id);
+      if (h.state.sunk || h.state.effects?.sunk) {
+        console.log(`[DEBUG] Cleaning up sunk ship ID ${id} (${h.state.displayName})`);
+        try { fullyDespawnShipById(id, { emitSmoke: false }); } catch {}
+        cleaned++;
+      }
+    });
+    console.log(`[DEBUG] Cleaned up ${cleaned} sunk ships`);
+    window.listAllShips();
   };
 
   // === Target Leading Utilities ===
@@ -270,13 +382,13 @@
       try { if (window.EnemyFleet1 instanceof Set) window.EnemyFleet1.delete(id); } catch {}
       // Hide HUDs and stop cycles for this id
       try { if (typeof cleanupSunkShipById === 'function') cleanupSunkShipById(id); } catch {}
-      // Promote next leader if needed
+      // Promote next leader if needed - this will handle despawn internally
       try {
         // Determine fleet id: prefer state.fleetId, else check assignment maps
         let fid = st.fleetId || 0;
         if (!fid) {
           try {
-            const maps = [window.IronTideFleetAssignments, window.fleetAssignments, window.fa];
+            const maps = [window.FleetAssignments, window.fleetAssignments, window.fa];
             for (const m of maps) {
               if (!m) continue;
               for (const k of [1,2,3]) {
@@ -287,10 +399,16 @@
             }
           } catch {}
         }
-        if (fid) promoteFleetLeaderIfSunk(fid);
+        if (fid) {
+          console.log(`[MARK-SUNK] Ship ID ${id} is in fleet ${fid}, calling promoteFleetLeaderIfSunk`);
+          promoteFleetLeaderIfSunk(fid);
+        } else {
+          // No fleet assignment, just despawn directly
+          console.log(`[MARK-SUNK] Ship ID ${id} has no fleet assignment, despawning directly`);
+          try { if (typeof window.shipSunk === 'function') window.shipSunk(r && (r.handle || r)); } catch {}
+        }
       } catch {}
-      // Despawn/remove from active registries and retire ID
-      try { if (typeof window.shipSunk === 'function') window.shipSunk(r && (r.handle || r)); } catch {}
+      // NOTE: Do NOT call shipSunk here if we called promoteFleetLeaderIfSunk, as it handles despawn internally
       return true;
     } catch { return false; }
   };
@@ -313,6 +431,22 @@
       try { if (Array.isArray(window.EnemyFleet1)) window.EnemyFleet1 = window.EnemyFleet1.filter(h => !(h && h.state && String(h.state.id) === idStr)); } catch {}
       try { if (Array.isArray(window.EnemyFleet2)) window.EnemyFleet2 = window.EnemyFleet2.filter(h => !(h && h.state && String(h.state.id) === idStr)); } catch {}
       try { if (Array.isArray(window.EnemyFleet3)) window.EnemyFleet3 = window.EnemyFleet3.filter(h => !(h && h.state && String(h.state.id) === idStr)); } catch {}
+      // CRITICAL FIX: Remove from all Fleet arrays
+      try {
+        const fleets = [window.Fleet1, window.Fleet2, window.Fleet3];
+        fleets.forEach((fleet, index) => {
+          if (Array.isArray(fleet)) {
+            const before = fleet.length;
+            const newFleet = fleet.filter(h => !(h && h.state && String(h.state.id) === idStr));
+            if (before !== newFleet.length) {
+              console.log(`[SHIP-SUNK] Removed ID ${idStr} from Fleet${index + 1} (${before} -> ${newFleet.length})`);
+              if (index === 0) window.Fleet1 = newFleet;
+              else if (index === 1) window.Fleet2 = newFleet;
+              else window.Fleet3 = newFleet;
+            }
+          }
+        });
+      } catch {}
       try { if (Array.isArray(window.activeShips)) window.activeShips = window.activeShips.filter(s => String((s && (s.id||s.state?.id))) !== idStr); } catch {}
       // Unregister HUD for this ship only
       try {
@@ -503,28 +637,38 @@
     } catch { return { x: target.x, y: target.y, t: 0 }; }
   }
 
-  // Take over a specific ship by id as the player (keep it in IronTideFleet, just rebind as player)
+  // Take over a specific ship by id as the player (keep it in Fleet arrays, just rebind as player)
   function takeoverShipById(idStr) {
     try {
       if (!idStr) return false;
       const prevPlayerId = (window.shipState && window.shipState.id != null) ? String(window.shipState.id) : '';
-      // Find handle by id in friendly fleets
+      console.log(`[TAKEOVER] Previous player ID: ${prevPlayerId}, taking over ID: ${idStr}`);
+      // Search all Fleet arrays for the ship
       let h = null;
-      const fleets = [];
-      try { if (Array.isArray(window.Fleet1)) fleets.push(...window.Fleet1); } catch {}
-      try { if (Array.isArray(window.Fleet2)) fleets.push(...window.Fleet2); } catch {}
-      try { if (Array.isArray(window.Fleet3)) fleets.push(...window.Fleet3); } catch {}
-      for (let i = 0; i < fleets.length; i++) {
-        const cand = fleets[i];
-        if (cand && cand.state && String(cand.state.id) === String(idStr)) { h = cand; break; }
+      const fleets = [window.Fleet1, window.Fleet2, window.Fleet3];
+      for (let f = 0; f < fleets.length; f++) {
+        if (Array.isArray(fleets[f])) {
+          for (let i = 0; i < fleets[f].length; i++) {
+            const cand = fleets[f][i];
+            if (cand && cand.state && String(cand.state.id) === String(idStr)) { 
+              h = cand; 
+              console.log(`[TAKEOVER] Found ship ID ${idStr} in Fleet${f+1} at index ${i}`);
+              break; 
+            }
+          }
+          if (h) break;
+        }
       }
-      if (!h || !h.state || !h.state.ship) return false;
+      if (!h || !h.state || !h.state.ship) {
+        console.error(`[TAKEOVER] Failed to find ship ID ${idStr} or ship has no state/ship object`);
+        return false;
+      }
       const id = String(h.state.id);
       // Remove from enemy behavior lists if any (legacy)
       try { /* no-op: EnemyFleet1 Set removed */ } catch {}
       // Ensure assigned to Fleet 1 for player control
       try {
-        const fa = window.IronTideFleetAssignments || { 1:new Set(),2:new Set(),3:new Set() };
+        const fa = window.FleetAssignments || { 1:new Set(),2:new Set(),3:new Set() };
         [1,2,3].forEach(k=>{ try { if (fa[k] instanceof Set) fa[k].delete(id); } catch {} });
         if (fa[1] instanceof Set) fa[1].add(id);
       } catch {}
@@ -544,28 +688,19 @@
           window.allShips = window.allShips.filter(h => String(h?.state?.id) !== '50');
         }
       } catch {}
-      // Switch global player references (this ship IS now the player)
-      // CRITICAL: Copy properties from new ship to the existing globals so const references continue to work
+      // CRITICAL FIX: Before overwriting shipState, we need to handle the old player
+      // The problem: if we Object.assign, the old player's state object gets ID 2's properties
+      // This creates a duplicate ID 2 in IronTideFleet!
+      // Solution: Just replace the reference entirely, don't try to preserve the old object
       try {
-        if (window.shipState && h.state) {
-          Object.assign(window.shipState, h.state);
-        } else {
-          window.shipState = h.state;
-        }
+        // Simply replace the global reference - don't try to preserve old object
+        window.shipState = h.state;
+        console.log(`[TAKEOVER] Replaced window.shipState with new ship ID ${h.state.id}`);
       } catch {}
       try {
-        if (window.ship && h.state.ship) {
-          // Copy all properties from new ship to existing ship object so const references work
-          Object.keys(h.state.ship).forEach(k => { try { window.ship[k] = h.state.ship[k]; } catch {} });
-          // Also set direct properties
-          window.ship.x = h.state.ship.x;
-          window.ship.y = h.state.ship.y;
-          window.ship.heading = h.state.ship.heading;
-          window.ship.desiredHeading = h.state.ship.desiredHeading;
-          window.ship.speed = h.state.ship.speed;
-        } else {
-          window.ship = h.state.ship;
-        }
+        // Simply replace window.ship reference too - don't try to preserve old object
+        window.ship = h.state.ship;
+        console.log(`[TAKEOVER] Replaced window.ship with new ship at (${window.ship.x}, ${window.ship.y})`);
       } catch {}
       try { window.shipProfile = h.profile; } catch {}
       try { if (h.damageModel) { window.damageModel = h.damageModel; } } catch {}
@@ -578,8 +713,17 @@
       // Reset targeting and FIRE
       try { if (typeof window.setFireEnabled === 'function') window.setFireEnabled(false); } catch {}
       try { if (window.firingSolution) { window.firingSolution.target = null; window.firingSolution.targetId = null; } } catch {}
-      // Move camera to new ship
-      try { if (typeof camera === 'object') { camera.cx = h.state.ship.x; camera.cy = h.state.ship.y; currentViewRect = getViewRect(); } } catch {}
+      // Move camera to new ship - CRITICAL FIX
+      try { 
+        if (typeof camera === 'object' && camera) { 
+          camera.cx = h.state.ship.x; 
+          camera.cy = h.state.ship.y; 
+          console.log(`[TAKEOVER] Camera moved to new ship at (${camera.cx.toFixed(1)}, ${camera.cy.toFixed(1)})`);
+          if (typeof getViewRect === 'function') currentViewRect = getViewRect(); 
+        } 
+      } catch (err) {
+        console.error('[TAKEOVER] Failed to move camera:', err);
+      }
       // Clear despawn flag if set
       try { window.PlayerDespawned = false; } catch {}
       // Enable follow
@@ -637,13 +781,23 @@
   function promoteFleetLeaderIfSunk(fid) {
     try {
       const leader = getFleetLeader(fid);
-      if (!leader || !leader.state) return;
+      if (!leader || !leader.state) {
+        // Don't spam console for empty fleets
+        return;
+      }
       const sunk = !!(leader.state.effects?.sunk || leader.state.sunk);
-      if (!sunk) return;
+      if (!sunk) {
+        // Leader is alive, no promotion needed (don't spam console)
+        return;
+      }
       const sunkId = String(leader.state.id);
+      console.log(`[PROMOTE] Fleet ${fid}: Leader ID ${sunkId} is SUNK, initiating promotion`);
       // If we've already processed this sunk leader, skip
       window.__ProcessedSunkLeaders__ = window.__ProcessedSunkLeaders__ || new Set();
-      if (window.__ProcessedSunkLeaders__.has(`${fid}:${sunkId}`)) return;
+      if (window.__ProcessedSunkLeaders__.has(`${fid}:${sunkId}`)) {
+        console.log(`[PROMOTE] Fleet ${fid}: Already processed sunk leader ${sunkId}, skipping`);
+        return;
+      }
       window.__ProcessedSunkLeaders__.add(`${fid}:${sunkId}`);
       // Ensure sunk flags set and highlight cleared
       try { leader.state.sunk = true; } catch {}
@@ -657,24 +811,56 @@
       let nextId = null;
       for (let i = 0; i < members.length; i++) {
         const id = members[i];
-        if (id === sunkId) continue;
+        if (id === sunkId) {
+          console.log(`[PROMOTE] Fleet ${fid}: Skipping sunk leader ID ${id}`);
+          continue;
+        }
         // ensure alive
         const h = getShipHandleById(id);
-        if (h && h.state && !(h.state.effects?.sunk || h.state.sunk)) { nextId = id; break; }
+        console.log(`[PROMOTE] Fleet ${fid}: Checking member ID ${id}, handle: ${!!h}, state: ${!!h?.state}, sunk: ${!!(h?.state?.effects?.sunk || h?.state?.sunk)}`);
+        if (h && h.state && !(h.state.effects?.sunk || h.state.sunk)) { 
+          nextId = id; 
+          console.log(`[PROMOTE] Fleet ${fid}: Selected next leader ID ${nextId}`);
+          break; 
+        }
       }
-      console.log(`[PROMOTE] Next leader for fleet ${fid}: ${nextId} (sunk: ${sunkId})`);
-      // Despawn the sunk leader: remove images/TMX, emit funnel smoke, remove from registries and assignments
-      try { fullyDespawnShipById(sunkId, { emitSmoke: true }); } catch {}
-      if (!nextId) { return; }
+      console.log(`[PROMOTE] Fleet ${fid}: Next leader: ${nextId} (sunk: ${sunkId})`);
+      
+      if (!nextId) { 
+        console.log(`[PROMOTE] Fleet ${fid}: No next leader found, despawning sunk leader and fleet is empty`);
+        try { fullyDespawnShipById(sunkId, { emitSmoke: true }); } catch {}
+        return; 
+      }
+      
+      // CRITICAL: Takeover/camera snap BEFORE despawning to avoid race conditions
       if (fid === 1) {
-        // Take over as the new player ship
-        takeoverShipById(nextId);
+        // Take over as the new player ship FIRST
+        console.log(`[PROMOTE] Fleet 1: Taking over ship ID ${nextId} as new player BEFORE despawn`);
+        const takeoverSuccess = takeoverShipById(nextId);
+        if (!takeoverSuccess) {
+          console.error(`[PROMOTE] Fleet 1: FAILED to takeover ship ID ${nextId}!`);
+        }
       } else {
         // For fleets 2/3, simply snap to new leader and keep follow
+        console.log(`[PROMOTE] Fleet ${fid}: Snapping camera to new leader ID ${nextId} BEFORE despawn`);
         try { snapCameraToFleetLeader(fid); } catch {}
         try { window.viewFollow = window.viewFollow || { enabled:true, mode:'fleet', fleetId: fid }; window.viewFollow.enabled = true; window.viewFollow.mode = 'fleet'; window.viewFollow.fleetId = fid; } catch {}
       }
-    } catch {}
+      
+      // NOW despawn the sunk leader AFTER takeover is complete
+      console.log(`[PROMOTE] Fleet ${fid}: About to despawn sunk leader ID ${sunkId}`);
+      console.log(`[PROMOTE] Fleet ${fid}: VERIFY - Sunk ship ID: ${sunkId}, Next leader ID: ${nextId}`);
+      // CRITICAL: Verify we're despawning the correct ship
+      const verifyHandle = getShipHandleById(sunkId);
+      if (verifyHandle && verifyHandle.state) {
+        console.log(`[PROMOTE] Fleet ${fid}: Verified sunk ship - ID: ${verifyHandle.state.id}, Name: ${verifyHandle.state.displayName}, Sunk: ${!!(verifyHandle.state.sunk || verifyHandle.state.effects?.sunk)}`);
+      }
+      try { fullyDespawnShipById(sunkId, { emitSmoke: true }); } catch {}
+      console.log(`[PROMOTE] Fleet ${fid}: Despawn complete for ID ${sunkId}`);
+      console.log(`[PROMOTE] Fleet ${fid}: Promotion complete`);
+    } catch (err) {
+      console.error(`[PROMOTE] Fleet ${fid}: Error during promotion:`, err);
+    }
   }
 
   // Ensure Damage Control global exists upfront and won't be clobbered later
@@ -1226,10 +1412,10 @@
         const worldWScaled = Math.round((baseIw / baseIh) * worldHScaled);
         // Fleet highlight ring for NPC if in selected fleet
         try {
-          const sel = window.IronTideSelectedFleet || 1;
+          const sel = window.SelectedFleet || 1;
           const isInSel = (function(){
             // Check all known fleet assignment stores for robustness
-            try { const A = window.IronTideFleetAssignments; if (A && A[sel] instanceof Set && (A[sel].has(npcId) || A[sel].has(Number(npcId)))) return true; } catch {}
+            try { const A = window.FleetAssignments; if (A && A[sel] instanceof Set && (A[sel].has(npcId) || A[sel].has(Number(npcId)))) return true; } catch {}
             try { const B = window.fleetAssignments; if (B && B[sel] instanceof Set && (B[sel].has(npcId) || B[sel].has(Number(npcId)))) return true; } catch {}
             try { const C = window.fa; if (C && C[sel] instanceof Set && (C[sel].has(npcId) || C[sel].has(Number(npcId)))) return true; } catch {}
             return false;
@@ -1412,7 +1598,7 @@
                   // Determine which fleet this NPC belongs to (robust to string/number IDs)
                   let fid = 0;
                   try {
-                    const fa = window.IronTideFleetAssignments || {};
+                    const fa = window.FleetAssignments || {};
                     const idNumNpc = npc && npc.state && npc.state.id != null ? Number(npc.state.id) : NaN;
                     const inSet = (s, vStr, vNum) => !!(s && (s.has(vStr) || (!Number.isNaN(vNum) && s.has(vNum))));
                     if (fa[1] instanceof Set && inSet(fa[1], idStrNpc, idNumNpc)) fid = 1;
@@ -1445,7 +1631,7 @@
                   // ONLY Fleet 2/3 logic - completely independent of Fleet 1
                   if (fid === 2 || fid === 3) {
                     // Check if this specific fleet has ships
-                    const fleetHasShips = !!(window.IronTideFleetAssignments && window.IronTideFleetAssignments[fid] && window.IronTideFleetAssignments[fid].size > 0);
+                    const fleetHasShips = !!(window.FleetAssignments && window.FleetAssignments[fid] && window.FleetAssignments[fid].size > 0);
                     const gState = (window.FleetGunnery && window.FleetGunnery[fid]) || {};
                     
                     // Turret lines are now handled by drawFleetTurretLinesWorld() - no duplicate code needed here
@@ -1467,11 +1653,17 @@
     } catch {}
   }
 
-  // Draw friendly fleet ships from IronTideFleet (with green circles for Fleet 1)
+  // Draw friendly fleet ships from all Fleet arrays (with green circles for selected fleet)
   function drawFriendlyFleetShips(){
     try {
-      if (!Array.isArray(window.IronTideFleet)) return;
+      // Collect all ships from Fleet1, Fleet2, and Fleet3
+      const allShips = [];
+      if (Array.isArray(window.Fleet1)) allShips.push(...window.Fleet1);
+      if (Array.isArray(window.Fleet2)) allShips.push(...window.Fleet2);
+      if (Array.isArray(window.Fleet3)) allShips.push(...window.Fleet3);
+      if (!allShips.length) return;
       const playerId = (window.shipState && window.shipState.id != null) ? String(window.shipState.id) : '1';
+      console.log(`[DRAW-FRIENDLY] All fleets have ${allShips.length} ships: ${allShips.map(s => `ID:${s?.state?.id}`).join(', ')}, player ID: ${playerId}`);
       const vr = currentViewRect || getViewRect();
       const scale = vr.scale;
       const targetHBase = 96;
@@ -1502,13 +1694,14 @@
         window.NpcScaledCache.set(src, off);
         return off;
       };
-      for (let i=0;i<window.IronTideFleet.length;i++){
-        const ship = window.IronTideFleet[i];
+      for (let i=0;i<allShips.length;i++){
+        const ship = allShips[i];
         if (!ship || !ship.state || !ship.state.ship) continue;
         const shipId = String(ship.state.id);
+        console.log(`[FRIENDLY-RENDER] Ship ID ${shipId} in Fleet at pos (${ship.state.ship.x.toFixed(1)}, ${ship.state.ship.y.toFixed(1)}), sunk: ${ship.state.sunk}, isPlayer: ${shipId === playerId}`);
         // Skip player ship (already drawn by drawShipWorld)
         if (shipId === playerId) {
-          if (window.VerboseLogs) console.log(`[FRIENDLY-RENDER] Skipping player ship ID ${shipId} (drawn separately)`);
+          console.log(`[FRIENDLY-RENDER] Skipping player ship ID ${shipId} (drawn separately)`);
           continue;
         }
         // Skip sunk ships
@@ -1539,9 +1732,9 @@
         const worldWScaled = Math.round((baseIw / baseIh) * worldHScaled);
         // Green circle for ships in selected fleet
         try {
-          const sel = window.IronTideSelectedFleet || 1;
+          const sel = window.SelectedFleet || 1;
           const isInSel = (function(){
-            try { const A = window.IronTideFleetAssignments; if (A && A[sel] instanceof Set && (A[sel].has(shipId) || A[sel].has(Number(shipId)))) return true; } catch {}
+            try { const A = window.FleetAssignments; if (A && A[sel] instanceof Set && (A[sel].has(shipId) || A[sel].has(Number(shipId)))) return true; } catch {}
             try { const B = window.fleetAssignments; if (B && B[sel] instanceof Set && (B[sel].has(shipId) || B[sel].has(Number(shipId)))) return true; } catch {}
             try { const C = window.fa; if (C && C[sel] instanceof Set && (C[sel].has(shipId) || C[sel].has(Number(shipId)))) return true; } catch {}
             return false;
@@ -1650,9 +1843,15 @@
   try {
     window.despawnNpc = function(){
       try {
-        if (npc1 && npc1.state && npc1.state.id != null && Array.isArray(window.IronTideFleet)) {
+        if (npc1 && npc1.state && npc1.state.id != null) {
           const idStr = String(npc1.state.id);
-          window.IronTideFleet = window.IronTideFleet.filter(e => !(e && e.state && String(e.state.id) === idStr));
+          // Remove from all fleets
+        [window.Fleet1, window.Fleet2, window.Fleet3].forEach(fleet => {
+          if (Array.isArray(fleet)) {
+            const index = fleet.findIndex(e => e && e.state && String(e.state.id) === idStr);
+            if (index !== -1) fleet.splice(index, 1);
+          }
+        });
         }
       } catch {}
       npc1 = null;
@@ -1667,7 +1866,13 @@
         if (npc1 && String(npc1.state && npc1.state.id) === idStr) { npc1 = null; try { window.npc1 = null; } catch {} }
         // Remove from IronTideFleet
         if (Array.isArray(window.IronTideFleet)) {
-          window.IronTideFleet = window.IronTideFleet.filter(e => !(e && e.state && String(e.state.id) === idStr));
+          // Remove from all fleets
+        [window.Fleet1, window.Fleet2, window.Fleet3].forEach(fleet => {
+          if (Array.isArray(fleet)) {
+            const index = fleet.findIndex(e => e && e.state && String(e.state.id) === idStr);
+            if (index !== -1) fleet.splice(index, 1);
+          }
+        });
         }
         // Remove from NPCs list
         if (Array.isArray(window.NPCs)) {
@@ -1676,8 +1881,8 @@
         // Remove from EnemyFleet1 grouping
         if (window.EnemyFleet1 instanceof Set) window.EnemyFleet1.delete(idStr);
         // Remove from Fleet assignments
-        if (window.IronTideFleetAssignments) {
-          [1,2,3].forEach(k=>{ try { if (window.IronTideFleetAssignments[k] instanceof Set) window.IronTideFleetAssignments[k].delete(idStr); } catch {} });
+        if (window.FleetAssignments) {
+          [1,2,3].forEach(k=>{ try { if (window.FleetAssignments[k] instanceof Set) window.FleetAssignments[k].delete(idStr); } catch {} });
         }
       } catch {}
     };
@@ -1688,7 +1893,7 @@
         const pid = (window.shipState && window.shipState.id != null) ? String(window.shipState.id) : '1';
         window.PlayerDespawned = true;
         // Remove from Fleet assignments so AI cannot select player as a valid target
-        const fa = window.IronTideFleetAssignments;
+        const fa = window.FleetAssignments;
         if (fa) { [1,2,3].forEach(k=>{ try { if (fa[k] instanceof Set) fa[k].delete(pid); } catch {} }); }
         // Optional: clear any NPC currentTargetId that was pointing to the player
         try {
@@ -1704,24 +1909,27 @@
     window.takeoverNearestFriendly = function(originX, originY){
       try {
         const enemySet = (window.EnemyFleet1 instanceof Set) ? window.EnemyFleet1 : new Set();
-        const fa = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+        const fa = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
         let ox = originX, oy = originY;
         try { if (!isFinite(ox) || !isFinite(oy)) { const vr = (typeof getViewRect === 'function') ? getViewRect() : { cx:0, cy:0 }; ox = vr.cx; oy = vr.cy; } } catch { ox = 0; oy = 0; }
-        // Collect friendly, alive ships from IronTideFleet
+        // Collect friendly, alive ships from all fleets
         const candidates = [];
-        if (Array.isArray(window.IronTideFleet)) {
-          for (let i=0;i<window.IronTideFleet.length;i++){
-            const h = window.IronTideFleet[i]; if (!h || !h.state || !h.state.ship) continue;
-            const idStr = String(h.state.id);
-            const isEnemy = enemySet.has(idStr);
-            const alive = !(h.state.effects?.sunk || h.state.sunk);
-            if (!isEnemy && alive) {
-              const sx = h.state.ship.x, sy = h.state.ship.y;
-              const d = Math.hypot((sx - ox), (sy - oy));
-              candidates.push({ handle: h, id: idStr, x: sx, y: sy, d });
+        const fleets = [window.Fleet1, window.Fleet2, window.Fleet3];
+        fleets.forEach(fleet => {
+          if (Array.isArray(fleet)) {
+            for (let i=0;i<fleet.length;i++){
+              const h = fleet[i]; if (!h || !h.state || !h.state.ship) continue;
+              const idStr = String(h.state.id);
+              const isEnemy = enemySet.has(idStr);
+              const alive = !(h.state.effects?.sunk || h.state.sunk);
+              if (!isEnemy && alive) {
+                const sx = h.state.ship.x, sy = h.state.ship.y;
+                const d = Math.hypot((sx - ox), (sy - oy));
+                candidates.push({ handle: h, id: idStr, x: sx, y: sy, d });
+              }
             }
           }
-        }
+        });
         if (!candidates.length) return false;
         candidates.sort((a,b)=>a.d - b.d);
         const picked = candidates[0];
@@ -2243,7 +2451,7 @@
     } catch {}
   }
   function playSplashSound(){
-    try { if (window.IronTideAudio && IronTideAudio.playSplash) IronTideAudio.playSplash(); } catch {}
+    try { if (window.GameAudio && GameAudio.playSplash) GameAudio.playSplash(); } catch {}
   }
 
   // --- Cannon SFX (HTMLAudio) ---
@@ -2255,7 +2463,7 @@
     } catch {}
   }
   function playCannonSound(){
-    try { if (window.IronTideAudio && IronTideAudio.playCannon) IronTideAudio.playCannon(); } catch {}
+    try { if (window.GameAudio && GameAudio.playCannon) GameAudio.playCannon(); } catch {}
   }
 
   // --- Shell Reload SFX (plays 5s after each turret fires) ---
@@ -2309,7 +2517,7 @@
 
   // Keep existing call site working; drive the engine/rest crossfade based on current speed
   function updateShipAudio(/*dt, actualSpeedKts*/){
-    try { if (window.IronTideAudio && IronTideAudio.updateEngineMix) IronTideAudio.updateEngineMix(); } catch {}
+    try { if (window.GameAudio && GameAudio.updateEngineMix) GameAudio.updateEngineMix(); } catch {}
   }
 
   // --- Ambient SFX (very intermittent random samples) ---
@@ -2836,7 +3044,7 @@
     // Skip drawing if player is sunk
     try { if (window.shipState && (window.shipState.effects?.sunk || window.shipState.sunk)) { console.log('[DRAW-PLAYER] Skipping player draw - sunk'); return; } } catch {}
     const playerId = (window.shipState && window.shipState.id != null) ? String(window.shipState.id) : '1';
-    if (window.VerboseLogs) console.log(`[DRAW-PLAYER] Drawing player ship ID ${playerId} at (${ship?.x}, ${ship?.y})`);
+    console.log(`[DRAW-PLAYER] Drawing player ship ID ${playerId} at (${ship?.x?.toFixed(1)}, ${ship?.y?.toFixed(1)}), shipState.id: ${window.shipState?.id}, ship object: ${!!window.ship}`);
     const vr = currentViewRect || getViewRect();
     const scale = vr.scale;
     const targetHBase = 96;
@@ -2844,11 +3052,11 @@
     const worldH = Math.max(1, targetHScreen / scale);
     // Fleet highlight ring (selected fleet only)
     try {
-      const sel = window.IronTideSelectedFleet || 1;
+      const sel = window.SelectedFleet || 1;
       const playerId = (window.shipState && window.shipState.id) ? String(window.shipState.id) : '';
       // Robust membership check across all assignment stores; no defaulting to Fleet 1
       const isInSel = (function(){
-        try { const A = window.IronTideFleetAssignments; if (A && A[sel] instanceof Set && (A[sel].has(playerId) || A[sel].has(Number(playerId)))) return true; } catch {}
+        try { const A = window.FleetAssignments; if (A && A[sel] instanceof Set && (A[sel].has(playerId) || A[sel].has(Number(playerId)))) return true; } catch {}
         try { const B = window.fleetAssignments; if (B && B[sel] instanceof Set && (B[sel].has(playerId) || B[sel].has(Number(playerId)))) return true; } catch {}
         try { const C = window.fa; if (C && C[sel] instanceof Set && (C[sel].has(playerId) || C[sel].has(Number(playerId)))) return true; } catch {}
         return false;
@@ -2876,7 +3084,7 @@
     // On touch devices, also render when placing/has target to help aiming.
     const isTouch = (typeof window !== 'undefined') && (('ontouchstart' in window) || (navigator && navigator.maxTouchPoints > 0));
     // playerId already declared above at line 2836
-    const playerInFleet1 = !!(playerId && window.IronTideFleetAssignments && window.IronTideFleetAssignments[1] && window.IronTideFleetAssignments[1].has(playerId));
+    const playerInFleet1 = !!(playerId && window.FleetAssignments && window.FleetAssignments[1] && window.FleetAssignments[1].has(playerId));
     const desktopGate = playerInFleet1 && (typeof gunnery !== 'undefined' && gunnery && gunnery.enabled);
     const mobileGate = isTouch || (typeof gunneryFire !== 'undefined' && gunneryFire && gunneryFire.enabled) || (isTouch && ((firingSolution && (firingSolution.placing || firingSolution.target))));
     if (desktopGate || mobileGate) {
@@ -2905,7 +3113,7 @@
     }
     // Additionally, when Fleet 2 or Fleet 3 gunnery is toggled ON, always show that fleet leader's range ring
     try {
-      const selFleet = (window.IronTideSelectedFleet || 1);
+      const selFleet = (window.SelectedFleet || 1);
       if (selFleet !== 1) {
         window.FleetGunnery = window.FleetGunnery || { 2: {}, 3: {} };
         const fg = window.FleetGunnery[selFleet];
@@ -3087,7 +3295,7 @@
           ctx.drawImage(turretImg, -turretW / 2, -turretH / 2, turretW, turretH);
           // Draw aim line from turret
           const playerId = window.shipState && window.shipState.id != null ? String(window.shipState.id) : null;
-          const fa = window.IronTideFleetAssignments || {};
+          const fa = window.FleetAssignments || {};
           const playerInFleet1 = !!(playerId && fa[1] instanceof Set && fa[1].has(playerId));
           const playerInFleet2 = !!(playerId && fa[2] instanceof Set && fa[2].has(playerId));
           const playerInFleet3 = !!(playerId && fa[3] instanceof Set && fa[3].has(playerId));
@@ -3195,7 +3403,7 @@
         // Direction buttons are bound later next to the setter (like Box)
         if (freeDrawResetBtn) { freeDrawResetBtn.addEventListener('click', ()=>{
           // Clear the current fleet's pattern and re-enter placement for free draw
-          const currentFleet = window.IronTideSelectedFleet || 1;
+          const currentFleet = window.SelectedFleet || 1;
           clearPattern(currentFleet);
           
           // Re-enter free draw placement mode for both FleetPatterns and live patterns
@@ -3260,7 +3468,7 @@
         }
         // Sync to current fleet's persisted patterns so following uses correct direction
         try {
-          const currentFleet = window.IronTideSelectedFleet || 1;
+          const currentFleet = window.SelectedFleet || 1;
           if (window.FleetPatterns && window.FleetPatterns[currentFleet]) {
             window.FleetPatterns[currentFleet].boxCw = !!cw;
           }
@@ -3306,7 +3514,7 @@
         }
         // Sync to current fleet's persisted patterns so following uses correct direction
         try {
-          const currentFleet = window.IronTideSelectedFleet || 1;
+          const currentFleet = window.SelectedFleet || 1;
           window.FleetPatterns = window.FleetPatterns || {};
           window.FleetPatterns[currentFleet] = window.FleetPatterns[currentFleet] || {};
           window.FleetPatterns[currentFleet].freeDrawCw = !!cw;
@@ -3341,7 +3549,7 @@
       const boxResetBtn = document.getElementById('boxReset');
       if (boxResetBtn) boxResetBtn.addEventListener('click', ()=>{
         // Clear the current fleet's pattern and re-enter placement for box
-        const currentFleet = window.IronTideSelectedFleet || 1;
+        const currentFleet = window.SelectedFleet || 1;
         clearPattern(currentFleet);
         
         // Re-enter box placement mode
@@ -3352,7 +3560,7 @@
         fleetPatterns.guiding = true;
         
         // Also update global patterns for current fleet
-        if (currentFleet === (window.IronTideSelectedFleet || 1)) {
+        if (currentFleet === (window.SelectedFleet || 1)) {
           patterns.selected = 'box';
           patterns.pendingSelection = 'box';
           patterns.placingPin = true;
@@ -3536,8 +3744,8 @@
       try { dm = new DamageModel(state); } catch {}
       // Register in fleet for HUD lookup
       try {
-        window.IronTideFleetNextId = (window.IronTideFleetNextId || 1) + 1;
-        state.id = window.IronTideFleetNextId; // ensure unique if needed
+        window.NextShipId = (window.NextShipId || 1) + 1;
+        state.id = window.NextShipId; // ensure unique if needed
         window.IronTideFleet = window.IronTideFleet || [];
         window.IronTideFleet.push({ state, profile: prof });
         // Ensure enemy grouping for targeting separation
@@ -3607,7 +3815,7 @@
       // Do NOT overwrite prof.name; keep original (e.g., "Bismarck") for HUD left side
       const assignedId = allocateStrictId(sideKey, opts && opts.requestedId);
       const state = {
-        id: (assignedId != null ? assignedId : (window.IronTideFleetNextId = (window.IronTideFleetNextId || 1) + 1)),
+        id: (assignedId != null ? assignedId : (window.NextShipId = (window.NextShipId || 1) + 1)),
         displayName,
         side: sideKey,
         SPEED_MIN: -8,  // Fresh default values, not inherited from player
@@ -3624,16 +3832,20 @@
       let dm = null; try { dm = new DamageModel(state); } catch {}
       const npc = { state, profile: prof, damageModel: dm };
       // CRITICAL: Add to correct array based on side to prevent duplicates
-      // Friendly -> IronTideFleet only; Enemy -> NPCs only
+      // Friendly -> IronTideFleet AND Fleet1; Enemy -> NPCs only
       if (sideKey === 'enemy') {
         window.NPCs = window.NPCs || [];
         window.NPCs.push(npc);
         // Maintain legacy handle to latest NPC for backwards usage
         npc1 = npc; try { window.npc1 = npc; } catch {}
       } else {
-        // Friendly ships go into IronTideFleet
+        // Friendly ships go into IronTideFleet (legacy) AND Fleet1 (for rendering)
         window.IronTideFleet = window.IronTideFleet || [];
         window.IronTideFleet.push(npc);
+        // CRITICAL: Also add to Fleet1 array so drawFriendlyFleetShips() can render it
+        window.Fleet1 = Array.isArray(window.Fleet1) ? window.Fleet1 : [];
+        window.Fleet1.push(npc);
+        console.log(`[SPAWN-FRIENDLY] Added friendly ${typeLabel} ID ${state.id} to both IronTideFleet and Fleet1`);
       }
       // Group into Enemy Fleet 1 if enemy; otherwise leave to caller to assign
       try {
@@ -3642,11 +3854,11 @@
         if (sideKey !== 'friendly') window.EnemyFleet1.add(idStr);
         // Assign friendly ships to Fleet 1 by default
         if (sideKey === 'friendly') {
-          window.IronTideFleetAssignments = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
-          [1,2,3].forEach(k=>{ if (!(window.IronTideFleetAssignments[k] instanceof Set)) window.IronTideFleetAssignments[k] = new Set(); });
-          window.IronTideFleetAssignments[2].delete(idStr);
-          window.IronTideFleetAssignments[3].delete(idStr);
-          window.IronTideFleetAssignments[1].add(idStr);
+          window.FleetAssignments = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+          [1,2,3].forEach(k=>{ if (!(window.FleetAssignments[k] instanceof Set)) window.FleetAssignments[k] = new Set(); });
+          window.FleetAssignments[2].delete(idStr);
+          window.FleetAssignments[3].delete(idStr);
+          window.FleetAssignments[1].add(idStr);
         }
       } catch {}
       
@@ -3671,7 +3883,8 @@
   function drawNpcShipWorld() {
     if (!npc1 || !shipImg) return;
     // Skip drawing if npc1 is sunk
-    try { if (npc1.state && (npc1.state.effects?.sunk || npc1.state.sunk)) return; } catch {}
+    try { if (npc1.state && (npc1.state.effects?.sunk || npc1.state.sunk)) { console.log(`[DRAW-NPC1] Skipping npc1 draw - sunk (ID: ${npc1.state.id})`); return; } } catch {}
+    console.log(`[DRAW-NPC1] Drawing npc1 ID ${npc1?.state?.id} at (${npc1?.state?.ship?.x?.toFixed(1)}, ${npc1?.state?.ship?.y?.toFixed(1)})`);
     const vr = currentViewRect || getViewRect();
     const scale = vr.scale;
     const targetHBase = 96;
@@ -3712,10 +3925,10 @@
     const npc1IsEnemy = enemySet1.has(npc1Id) || enemySet1.has(Number(npc1Id)) || npc1Side === 'enemy';
     // Fleet highlight ring for NPC if in selected fleet (avoid for enemies)
     try {
-      const sel = window.IronTideSelectedFleet || 1;
+      const sel = window.SelectedFleet || 1;
       const npcId = npc1Id;
       const isInSel = (function(){
-        try { const A = window.IronTideFleetAssignments; if (A && A[sel] instanceof Set && (A[sel].has(npcId) || A[sel].has(Number(npcId)))) return true; } catch {}
+        try { const A = window.FleetAssignments; if (A && A[sel] instanceof Set && (A[sel].has(npcId) || A[sel].has(Number(npcId)))) return true; } catch {}
         try { const B = window.fleetAssignments; if (B && B[sel] instanceof Set && (B[sel].has(npcId) || B[sel].has(Number(npcId)))) return true; } catch {}
         try { const C = window.fa; if (C && C[sel] instanceof Set && (C[sel].has(npcId) || C[sel].has(Number(npcId)))) return true; } catch {}
         return false;
@@ -4007,7 +4220,7 @@
   (function setupDockToggles(){
     try {
       // Helpers for fleet selection - now all fleets have full access
-      function isFleet1Selected(){ return (window.IronTideSelectedFleet || 1) === 1; }
+      function isFleet1Selected(){ return (window.SelectedFleet || 1) === 1; }
       function setupDockInteractivityBlocker(){
         const dock = document.getElementById('navalDock');
         if (!dock) return;
@@ -4042,12 +4255,12 @@
             try {
               const idx = Array.prototype.indexOf.call(fleetBtns, btn);
               const newFleetId = (idx >= 0 ? (idx + 1) : 1);
-              const oldFleetId = window.IronTideSelectedFleet || 1;
+              const oldFleetId = window.SelectedFleet || 1;
               
               // Save current fleet settings before switching
               if (oldFleetId !== newFleetId) {
                 saveCurrentFleetSettings(oldFleetId);
-                window.IronTideSelectedFleet = newFleetId;
+                window.SelectedFleet = newFleetId;
                 loadFleetSettings(newFleetId);
                 
                 // Snap camera to fleet leader (must always happen on fleet select)
@@ -4066,10 +4279,10 @@
             try {
               const vBtn = document.querySelector('#navalDock .gunnery-view-btn');
               if (vBtn) { vBtn.classList.remove('brass-selected'); vBtn.setAttribute('aria-pressed','false'); }
-              window.viewFollow = window.viewFollow || { enabled: true, mode: 'fleet', fleetId: window.IronTideSelectedFleet || 1 };
+              window.viewFollow = window.viewFollow || { enabled: true, mode: 'fleet', fleetId: window.SelectedFleet || 1 };
               window.viewFollow.enabled = true;
               window.viewFollow.mode = 'fleet';
-              window.viewFollow.fleetId = window.IronTideSelectedFleet || 1;
+              window.viewFollow.fleetId = window.SelectedFleet || 1;
             } catch {}
           };
           btn.addEventListener('click', toggle);
@@ -4132,29 +4345,29 @@
           3: { targetId: null, fireEnabled: false, gunneryEnabled: false, lastSalvoAt: 0, intervalSec: 10 }
         };
         // Initialize manual heading hold flags (per-fleet)
-        window.IronTideManualHeadingHold = window.IronTideManualHeadingHold || { 1: false, 2: false, 3: false };
+        window.ManualHeadingHold = window.ManualHeadingHold || { 1: false, 2: false, 3: false };
         // Create a simple fleet assignment table on window
         const playerId = (window.shipState && window.shipState.id) ? String(window.shipState.id) : '1';
-        window.IronTideFleetAssignments = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+        window.FleetAssignments = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
         // Ensure Sets for idempotency
-        [1,2,3].forEach(k=>{ if (!(window.IronTideFleetAssignments[k] instanceof Set)) window.IronTideFleetAssignments[k] = new Set(); });
+        [1,2,3].forEach(k=>{ if (!(window.FleetAssignments[k] instanceof Set)) window.FleetAssignments[k] = new Set(); });
         // Assign player ship to Fleet 1 exclusively
-        window.IronTideFleetAssignments[2].delete(playerId);
-        window.IronTideFleetAssignments[3].delete(playerId);
-        window.IronTideFleetAssignments[1].add(playerId);
+        window.FleetAssignments[2].delete(playerId);
+        window.FleetAssignments[3].delete(playerId);
+        window.FleetAssignments[1].add(playerId);
         // Default selected fleet is 1
-        window.IronTideSelectedFleet = 1;
+        window.SelectedFleet = 1;
         // Install blocker now that dock exists
         try { setupDockInteractivityBlocker(); } catch {}
         // Initialize per-fleet control states (Fleet 1 bound to live ship; 2/3 default templates)
-        window.IronTideFleetStates = window.IronTideFleetStates || {};
-        window.IronTideFleetStates[1] = window.IronTideFleetStates[1] || {
+        window.FleetStates = window.FleetStates || {};
+        window.FleetStates[1] = window.FleetStates[1] || {
           desiredHeading: (typeof ship.desiredHeading === 'number' ? ship.desiredHeading : 0),
           speedKts: (typeof shipState?.speedKts === 'number' ? shipState.speedKts : 0),
           moveTarget: null
         };
-        window.IronTideFleetStates[2] = window.IronTideFleetStates[2] || { desiredHeading: 0, speedKts: 0, moveTarget: null };
-        window.IronTideFleetStates[3] = window.IronTideFleetStates[3] || { desiredHeading: 0, speedKts: 0, moveTarget: null };
+        window.FleetStates[2] = window.FleetStates[2] || { desiredHeading: 0, speedKts: 0, moveTarget: null };
+        window.FleetStates[3] = window.FleetStates[3] || { desiredHeading: 0, speedKts: 0, moveTarget: null };
       } catch {}
     } catch {}
   })();
@@ -4186,7 +4399,7 @@
   function collectFriendlyShips(){
     const friendlies = [];
     try {
-      const fleetA = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+      const fleetA = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
       const enemySet = window.EnemyFleet1 instanceof Set ? window.EnemyFleet1 : new Set();
       
       if (Array.isArray(window.NPCs)) {
@@ -4347,7 +4560,7 @@
             (patterns && (patterns.selected === 'freedraw' || patterns.pendingSelection === 'freedraw')) ||
             (function(){
               try {
-                const cf = window.IronTideSelectedFleet || 1;
+                const cf = window.SelectedFleet || 1;
                 const fp = window.FleetPatterns && window.FleetPatterns[cf];
                 return fp && (fp.selected === 'freedraw' || fp.pendingSelection === 'freedraw');
               } catch { return false; }
@@ -4399,7 +4612,7 @@
                 if (gunnery.enabled) window.FleetGunneryCycle[1].index = -1;
               } else {
                 // Fleet 2/3 toggle their gunnery state - but only if fleet has ships
-                const fleetHasShips = !!(window.IronTideFleetAssignments && window.IronTideFleetAssignments[fleetId] && window.IronTideFleetAssignments[fleetId].size > 0);
+                const fleetHasShips = !!(window.FleetAssignments && window.FleetAssignments[fleetId] && window.FleetAssignments[fleetId].size > 0);
                 if (!fleetHasShips) {
                   console.log(`Fleet ${fleetId} has no ships - gunnery cannot be enabled`);
                   return;
@@ -4410,7 +4623,7 @@
                 g.gunneryEnabled = !g.gunneryEnabled;
                 btn.classList.toggle('active', g.gunneryEnabled);
                 btn.setAttribute('aria-pressed', g.gunneryEnabled ? 'true' : 'false');
-                console.log(`Fleet ${fleetId} gunnery ${g.gunneryEnabled ? 'ENABLED' : 'DISABLED'} (has ${window.IronTideFleetAssignments[fleetId].size} ships)`);
+                console.log(`Fleet ${fleetId} gunnery ${g.gunneryEnabled ? 'ENABLED' : 'DISABLED'} (has ${window.FleetAssignments[fleetId].size} ships)`);
                 if (g.gunneryEnabled) window.FleetGunneryCycle[fleetId].index = -1;
               }
             });
@@ -4624,12 +4837,12 @@
 
       // --- Per-fleet order container + persistence helpers ---
       function getFleetSettings(fleetId){
-        window.IronTideFleetSettings = window.IronTideFleetSettings || { 1:{},2:{},3:{} };
-        if (!window.IronTideFleetSettings[fleetId]) window.IronTideFleetSettings[fleetId] = {};
-        return window.IronTideFleetSettings[fleetId];
+        window.FleetSettings = window.FleetSettings || { 1:{},2:{},3:{} };
+        if (!window.FleetSettings[fleetId]) window.FleetSettings[fleetId] = {};
+        return window.FleetSettings[fleetId];
       }
 
-      function storageKeyForOrder(fleetId){ return `IronTide_Fleet_${fleetId}_Order`; }
+      function storageKeyForOrder(fleetId){ return `Fleet_${fleetId}_Order`; }
 
       function loadFleetOrderFromStorage(fleetId){
         try {
@@ -4682,14 +4895,14 @@
           window.FleetLeaders[fleetId] = cur;
 
           // Persist lightweight leader mapping alongside order for resilience
-          try { localStorage.setItem(`IronTide_Fleet_${fleetId}_Leader`, cur || ''); } catch {}
+          try { localStorage.setItem(`Fleet_${fleetId}_Leader`, cur || ''); } catch {}
 
           // If the actively selected fleet changed leader, refresh dock UI to bind controls to new leader
           try {
-            if (window.IronTideSelectedFleet === fleetId) {
+            if (window.SelectedFleet === fleetId) {
               // Best-effort refresh: reload fleet settings and compass needles so heading/speed reflect new leader
               if (typeof window.loadFleetSettings === 'function') window.loadFleetSettings(fleetId);
-              const settings = (window.IronTideFleetSettings && window.IronTideFleetSettings[fleetId]) ? window.IronTideFleetSettings[fleetId] : null;
+              const settings = (window.FleetSettings && window.FleetSettings[fleetId]) ? window.FleetSettings[fleetId] : null;
               if (typeof updateCompassNeedles === 'function' && settings) updateCompassNeedles(settings);
 
               // Auto-switch camera + follow to new leader for the selected fleet
@@ -4830,17 +5043,18 @@
       function getShipsInFleet(fleetId) {
         const ships = [];
         const seen = new Set();
-        const fleetAssignments = window.IronTideFleetAssignments || {};
+        const fleetAssignments = window.FleetAssignments || {};
         
         // Only get ships assigned to THIS specific fleet
         if (!fleetAssignments[fleetId]) {
           return ships; // Empty array if fleet doesn't exist
         }
         
-        // Collect from IronTideFleet only (includes player handle if present), to avoid duplicates
+        // Collect from the appropriate fleet array
         try {
-          if (Array.isArray(window.IronTideFleet)) {
-            window.IronTideFleet.forEach(h => {
+          const fleetArray = fleetId === 1 ? window.Fleet1 : fleetId === 2 ? window.Fleet2 : window.Fleet3;
+          if (Array.isArray(fleetArray)) {
+            fleetArray.forEach(h => {
               if (!h || !h.state) return;
               const shipId = String(h.state.id);
               
@@ -4859,7 +5073,7 @@
           }
         } catch {}
         
-        // If player is assigned to THIS fleet but not in IronTideFleet array for some reason, add once
+        // If player is assigned to THIS fleet but not in Fleet array for some reason, add once
         try {
           const playerId = (window.shipState && window.shipState.id != null) ? String(window.shipState.id) : '1';
           if (fleetAssignments[fleetId].has(playerId) && !seen.has(playerId)) {
@@ -5042,7 +5256,7 @@
 
       function transferShipToFleet(shipId, fromFleet, toFleet) {
         try {
-          const fleetAssignments = window.IronTideFleetAssignments || {};
+          const fleetAssignments = window.FleetAssignments || {};
           
           // Initialize fleet sets if needed
           if (!fleetAssignments[fromFleet]) fleetAssignments[fromFleet] = new Set();
@@ -5054,7 +5268,7 @@
           // Add to new fleet
           fleetAssignments[toFleet].add(shipId);
           
-          window.IronTideFleetAssignments = fleetAssignments;
+          window.FleetAssignments = fleetAssignments;
           
           console.log(`Transferred ship ${shipId} from Fleet ${fromFleet} to Fleet ${toFleet}`);
 
@@ -5063,14 +5277,14 @@
             // Ensure containers
             window.FleetGunnery = window.FleetGunnery || { 1:{},2:{},3:{} };
             window.FleetSolutionCalc = window.FleetSolutionCalc || { 1:{},2:{},3:{} };
-            window.IronTideFleetSettings = window.IronTideFleetSettings || { 1:{},2:{},3:{} };
+            window.FleetSettings = window.FleetSettings || { 1:{},2:{},3:{} };
             if (!window.FleetGunnery[toFleet]) window.FleetGunnery[toFleet] = {};
             if (!window.FleetSolutionCalc[toFleet]) window.FleetSolutionCalc[toFleet] = {};
-            if (!window.IronTideFleetSettings[toFleet]) window.IronTideFleetSettings[toFleet] = {};
+            if (!window.FleetSettings[toFleet]) window.FleetSettings[toFleet] = {};
 
             const srcG = window.FleetGunnery[fromFleet] || {};
             const srcSC = window.FleetSolutionCalc[fromFleet] || {};
-            const srcSet = window.IronTideFleetSettings[fromFleet] || {};
+            const srcSet = window.FleetSettings[fromFleet] || {};
 
             // Deep clone helper
             const clone = (o)=>{
@@ -5083,7 +5297,7 @@
             // Move solution calculator state
             window.FleetSolutionCalc[toFleet] = Object.assign({}, clone(srcSC));
             // Move turret angles and any fleet UI gunnery fields stored in settings
-            const dstSet = window.IronTideFleetSettings[toFleet];
+            const dstSet = window.FleetSettings[toFleet];
             dstSet.turretAngles = clone(srcSet.turretAngles || { t1:0, t2:0, t3:180, t4:180 });
             dstSet.targetId = (srcSet && srcSet.targetId != null) ? srcSet.targetId : (window.FleetGunnery[toFleet].targetId ?? null);
             dstSet.firingSolution = clone(srcSet.firingSolution || {});
@@ -5104,10 +5318,10 @@
             try {
               window.FleetGunnery[fromFleet] = { gunneryEnabled: false, fireEnabled: false, target: null, targetId: null };
               window.FleetSolutionCalc[fromFleet] = {};
-              if (window.IronTideFleetSettings[fromFleet]) {
-                window.IronTideFleetSettings[fromFleet].targetId = null;
-                window.IronTideFleetSettings[fromFleet].firingSolution = null;
-                window.IronTideFleetSettings[fromFleet].fireEnabled = false;
+              if (window.FleetSettings[fromFleet]) {
+                window.FleetSettings[fromFleet].targetId = null;
+                window.FleetSettings[fromFleet].firingSolution = null;
+                window.FleetSettings[fromFleet].fireEnabled = false;
               }
             } catch {}
 
@@ -5159,7 +5373,7 @@
       function promoteFleet1LeaderIfNeeded() {
         try {
           const fleetId = 1;
-          const assignments = window.IronTideFleetAssignments || {};
+          const assignments = window.FleetAssignments || {};
           const fset = assignments[fleetId];
           if (!(fset instanceof Set) || fset.size === 0) return; // nothing in fleet 1
 
@@ -5244,7 +5458,7 @@
 
           // Update fleet selection UI to Fleet 1 to reflect control
           try {
-            window.IronTideSelectedFleet = 1;
+            window.SelectedFleet = 1;
             // Refresh dock UI
             if (typeof document !== 'undefined') {
               const btn = document.querySelector('#navalDock .fleet-btn[data-fleet="1"]');
@@ -5274,8 +5488,8 @@
       }
 
       // Initialize fleet assignments if not present
-      if (!window.IronTideFleetAssignments) {
-        window.IronTideFleetAssignments = {
+      if (!window.FleetAssignments) {
+        window.FleetAssignments = {
           1: new Set(['1']), // Player starts in Fleet 1
           2: new Set(),
           3: new Set()
@@ -5285,7 +5499,7 @@
       // Fleet selection buttons in main UI: select fleet 1/2/3 and refresh UI
       try {
         const fleetSelectBtns = document.querySelectorAll('#navalDock .fleet-btn:not(.gunnery-title-btn)[data-fleet]');
-        let lastSelected = (window.IronTideSelectedFleet || 1);
+        let lastSelected = (window.SelectedFleet || 1);
         function updateFleetBtnStates(sel){
           fleetSelectBtns.forEach(b=>{
             const fid = parseInt(b.dataset.fleet);
@@ -5301,7 +5515,7 @@
               window.loadFleetSettings(sel);
             }
             // Update compass needles to reflect selected fleet leader
-            const settings = (window.IronTideFleetSettings && window.IronTideFleetSettings[sel]) ? window.IronTideFleetSettings[sel] : null;
+            const settings = (window.FleetSettings && window.FleetSettings[sel]) ? window.FleetSettings[sel] : null;
             if (typeof updateCompassNeedles === 'function' && settings) {
               updateCompassNeedles(settings);
             }
@@ -5316,7 +5530,7 @@
           btn.addEventListener('click', ()=>{
             const fid = parseInt(btn.dataset.fleet);
             if (!isFinite(fid)) return;
-            window.IronTideSelectedFleet = fid;
+            window.SelectedFleet = fid;
             updateFleetBtnStates(fid);
             refreshDockForFleet(fid);
             
@@ -5357,8 +5571,8 @@
     // Fleet-Specific Settings System
     try {
       // Initialize fleet settings storage
-      if (!window.IronTideFleetSettings) {
-        window.IronTideFleetSettings = {
+      if (!window.FleetSettings) {
+        window.FleetSettings = {
           1: createDefaultFleetSettings(),
           2: createDefaultFleetSettings(),
           3: createDefaultFleetSettings()
@@ -5400,7 +5614,7 @@
 
       window.saveCurrentFleetSettings = function(fleetId) {
         try {
-          const settings = window.IronTideFleetSettings[fleetId];
+          const settings = window.FleetSettings[fleetId];
           if (!settings) return;
           
           // Save movement settings
@@ -5491,7 +5705,7 @@
 
       window.loadFleetSettings = function(fleetId) {
         try {
-          const settings = window.IronTideFleetSettings[fleetId];
+          const settings = window.FleetSettings[fleetId];
           if (!settings) return;
           
           // Get the fleet leader (first ship in fleet)
@@ -5668,7 +5882,7 @@
 
       function updateCompassNeedles(settings) {
         try {
-          const currentFleet = window.IronTideSelectedFleet || 1;
+          const currentFleet = window.SelectedFleet || 1;
           const fleetLeader = getFleetLeader(currentFleet);
           
           // Update main fleet compass (in dock)
@@ -5717,7 +5931,7 @@
           }
           
           // Show only the active fleet's gunnery solution
-          const fleetSettings = window.IronTideFleetSettings[activeFleetId];
+          const fleetSettings = window.FleetSettings[activeFleetId];
           if (fleetSettings && fleetSettings.firingSolution) {
             window.firingSolution = fleetSettings.firingSolution;
             window.firingSolution.visible = true;
@@ -5729,8 +5943,8 @@
       }
 
       // Initialize with Fleet 1 selected
-      if (!window.IronTideSelectedFleet) {
-        window.IronTideSelectedFleet = 1;
+      if (!window.SelectedFleet) {
+        window.SelectedFleet = 1;
       }
 
       // Add event listeners to capture setting changes and apply to fleet leader
@@ -5740,9 +5954,9 @@
           const speedSlider = document.getElementById('speedSlider');
           if (speedSlider) {
             speedSlider.addEventListener('input', () => {
-              const currentFleet = window.IronTideSelectedFleet || 1;
+              const currentFleet = window.SelectedFleet || 1;
               const fleetLeader = getFleetLeader(currentFleet);
-              const settings = window.IronTideFleetSettings[currentFleet];
+              const settings = window.FleetSettings[currentFleet];
               
               const newSpeed = parseInt(speedSlider.value) || 0;
               
@@ -5768,8 +5982,8 @@
           const formationSelect = document.getElementById('formationSelect');
           if (formationSelect) {
             formationSelect.addEventListener('change', () => {
-              const currentFleet = window.IronTideSelectedFleet || 1;
-              const settings = window.IronTideFleetSettings[currentFleet];
+              const currentFleet = window.SelectedFleet || 1;
+              const settings = window.FleetSettings[currentFleet];
               if (settings) {
                 settings.formation = formationSelect.value;
               }
@@ -5816,8 +6030,8 @@
           const formationWidthInput = document.getElementById('formationWidth');
           if (formationWidthInput) {
             formationWidthInput.addEventListener('input', () => {
-              const currentFleet = window.IronTideSelectedFleet || 1;
-              const settings = window.IronTideFleetSettings[currentFleet];
+              const currentFleet = window.SelectedFleet || 1;
+              const settings = window.FleetSettings[currentFleet];
               if (settings) {
                 settings.formationWidth = parseInt(formationWidthInput.value) || 200;
               }
@@ -5828,8 +6042,8 @@
           const patternSelect = document.getElementById('patternSelect');
           if (patternSelect) {
             patternSelect.addEventListener('change', () => {
-              const currentFleet = window.IronTideSelectedFleet || 1;
-              const settings = window.IronTideFleetSettings[currentFleet];
+              const currentFleet = window.SelectedFleet || 1;
+              const settings = window.FleetSettings[currentFleet];
               if (settings) {
                 settings.pattern = patternSelect.value;
               }
@@ -5840,8 +6054,8 @@
           const formationInterval = document.getElementById('formationInterval');
           if (formationInterval) {
             formationInterval.addEventListener('input', () => {
-              const currentFleet = window.IronTideSelectedFleet || 1;
-              const settings = window.IronTideFleetSettings[currentFleet];
+              const currentFleet = window.SelectedFleet || 1;
+              const settings = window.FleetSettings[currentFleet];
               if (settings) {
                 // If input blank/invalid, fall back to formation-specific default
                 let v = parseInt(formationInterval.value);
@@ -5860,8 +6074,8 @@
           const formationAngleValue = document.getElementById('formationAngleValue');
           if (formationAngle) {
             formationAngle.addEventListener('input', () => {
-              const currentFleet = window.IronTideSelectedFleet || 1;
-              const settings = window.IronTideFleetSettings[currentFleet];
+              const currentFleet = window.SelectedFleet || 1;
+              const settings = window.FleetSettings[currentFleet];
               if (settings) settings.formationAngleDeg = parseInt(formationAngle.value) || 30;
               if (formationAngleValue) formationAngleValue.textContent = `${parseInt(formationAngle.value) || 30}Â°`;
             });
@@ -5871,8 +6085,8 @@
           const zigAmp = document.getElementById('zigAmp');
           if (zigAmp) {
             zigAmp.addEventListener('input', () => {
-              const currentFleet = window.IronTideSelectedFleet || 1;
-              const settings = window.IronTideFleetSettings[currentFleet];
+              const currentFleet = window.SelectedFleet || 1;
+              const settings = window.FleetSettings[currentFleet];
               if (settings) {
                 settings.patternAmplitude = parseInt(zigAmp.value) || 50;
               }
@@ -5883,7 +6097,7 @@
           const fleetCompass = document.getElementById('fleetCompass');
           if (fleetCompass) {
             fleetCompass.addEventListener('click', (e) => {
-              const currentFleet = window.IronTideSelectedFleet || 1;
+              const currentFleet = window.SelectedFleet || 1;
               const fleetLeader = getFleetLeader(currentFleet);
               
               if (!fleetLeader) return; // No ships in fleet
@@ -5905,7 +6119,7 @@
                 if (!patternActive) {
                   ship.desiredHeading = heading;
                   ship.moveTarget = null; // prevent click-to-move from overriding
-                  try { window.IronTideManualHeadingHold = window.IronTideManualHeadingHold || { 1:false,2:false,3:false }; window.IronTideManualHeadingHold[1] = true; } catch {}
+                  try { window.ManualHeadingHold = window.ManualHeadingHold || { 1:false,2:false,3:false }; window.ManualHeadingHold[1] = true; } catch {}
                   if (fleetLeader.state) {
                     fleetLeader.state.desiredHeading = heading;
                     if (fleetLeader.state.ship) {
@@ -5928,7 +6142,7 @@
               if (fcPlanned) setNeedle(fcPlanned, heading);
                 
               // Save to settings
-              const settings = window.IronTideFleetSettings[currentFleet];
+              const settings = window.FleetSettings[currentFleet];
               if (settings) {
                 settings.heading = heading;
               }
@@ -6187,7 +6401,7 @@
         if (fleetId === 1) {
           // Check if player ship is ACTUALLY in Fleet 1 (not just exists)
           const playerId = window.shipState && window.shipState.id != null ? String(window.shipState.id) : null;
-          const playerInFleet1 = !!(playerId && window.IronTideFleetAssignments && window.IronTideFleetAssignments[1] && window.IronTideFleetAssignments[1].has(playerId));
+          const playerInFleet1 = !!(playerId && window.FleetAssignments && window.FleetAssignments[1] && window.FleetAssignments[1].has(playerId));
           
           if (!playerInFleet1) {
             console.log(`Player ship is not in Fleet 1 - Fleet 1 gunnery cannot be enabled`);
@@ -6207,7 +6421,7 @@
           }
         } else {
           // Check if this fleet has ships before allowing gunnery toggle
-          const fleetHasShips = !!(window.IronTideFleetAssignments && window.IronTideFleetAssignments[fleetId] && window.IronTideFleetAssignments[fleetId].size > 0);
+          const fleetHasShips = !!(window.FleetAssignments && window.FleetAssignments[fleetId] && window.FleetAssignments[fleetId].size > 0);
           if (!fleetHasShips) {
             console.log(`Fleet ${fleetId} has no ships - gunnery cannot be enabled`);
             return; // Don't toggle if fleet is empty
@@ -6219,7 +6433,7 @@
           target.classList.toggle('active', g.gunneryEnabled);
           target.classList.toggle('brass-selected', g.gunneryEnabled);
           target.setAttribute('aria-pressed', g.gunneryEnabled ? 'true' : 'false');
-          console.log(`Fleet ${fleetId} gunnery ${g.gunneryEnabled ? 'ENABLED' : 'DISABLED'} (has ${window.IronTideFleetAssignments[fleetId].size} ships)`);
+          console.log(`Fleet ${fleetId} gunnery ${g.gunneryEnabled ? 'ENABLED' : 'DISABLED'} (has ${window.FleetAssignments[fleetId].size} ships)`);
           if (g.gunneryEnabled) {
             window.FleetGunneryCycle = window.FleetGunneryCycle || { 1:{ index: -1 }, 2:{ index: -1 }, 3:{ index: -1 } };
             if (!window.FleetGunneryCycle[fleetId]) window.FleetGunneryCycle[fleetId] = { index: -1 };
@@ -6887,7 +7101,7 @@
   }
   function ensureSolutionProgressBar(){
     try {
-      const currentFleet = (window.IronTideSelectedFleet || 1);
+      const currentFleet = (window.SelectedFleet || 1);
       const btn = document.querySelector(`#navalDock .get-firing-solution-btn[data-fleet="${currentFleet}"]`) || document.querySelector('#navalDock .get-firing-solution-btn');
       if (!btn) return;
       let track = btn.querySelector('.solution-progress');
@@ -6911,7 +7125,7 @@
       solutionCalc.duration = computeSolutionDurationSec() * 1000; // ms
       // Mirror to the selected fleet so fleets 2/3 can use solution-ready logic and UI
       try {
-        const currentFleet = (window.IronTideSelectedFleet || 1);
+        const currentFleet = (window.SelectedFleet || 1);
         if (!window.FleetSolutionCalc) window.FleetSolutionCalc = { 1:{},2:{},3:{} };
         const sc = window.FleetSolutionCalc[currentFleet] || (window.FleetSolutionCalc[currentFleet] = {});
         sc.active = true; sc.start = solutionCalc.start; sc.duration = solutionCalc.duration;
@@ -6960,8 +7174,8 @@
           firingSolution.hover = { x: w.x, y: w.y };
         } else if (firingSolution.dragging) {
           // Set target for current fleet only
-          const currentFleet = window.IronTideSelectedFleet || 1;
-          const fleetSettings = window.IronTideFleetSettings[currentFleet];
+          const currentFleet = window.SelectedFleet || 1;
+          const fleetSettings = window.FleetSettings[currentFleet];
           
           if (fleetSettings) {
             if (!fleetSettings.firingSolution) {
@@ -6987,8 +7201,8 @@
         const w = getWorldFromEvent(e);
         if (firingSolution.placing) {
           // Set target for current fleet only
-          const currentFleet = window.IronTideSelectedFleet || 1;
-          const fleetSettings = window.IronTideFleetSettings[currentFleet];
+          const currentFleet = window.SelectedFleet || 1;
+          const fleetSettings = window.FleetSettings[currentFleet];
           
           if (fleetSettings) {
             if (!fleetSettings.firingSolution) {
@@ -7038,8 +7252,8 @@
         const w = getWorldFromEvent(e);
         if (isNearTarget(w.x, w.y)) {
           // Clear target for current fleet only
-          const currentFleet = window.IronTideSelectedFleet || 1;
-          const fleetSettings = window.IronTideFleetSettings[currentFleet];
+          const currentFleet = window.SelectedFleet || 1;
+          const fleetSettings = window.FleetSettings[currentFleet];
           
           if (fleetSettings && fleetSettings.firingSolution) {
             fleetSettings.firingSolution.target = null;
@@ -7085,7 +7299,7 @@
         const nodes = document.querySelectorAll('audio, video');
         nodes.forEach(m => { try { m.muted = state.muted; } catch {} });
       } catch {}
-      try { if (window.IronTideAudio && typeof IronTideAudio.setMuted === 'function') IronTideAudio.setMuted(state.muted); } catch {}
+      try { if (window.GameAudio && typeof GameAudio.setMuted === 'function') GameAudio.setMuted(state.muted); } catch {}
     }
 
     // Hook media play to apply mute even for dynamically created media
@@ -7135,7 +7349,7 @@
         initButton(); applyToAll(); updateButton();
       });
     }
-    // Expose a dedicated global mute helper without modifying IronTideAudio methods
+    // Expose a dedicated global mute helper without modifying GameAudio methods
     try {
       window.IronTideMute = {
         get muted(){ return state.muted; },
@@ -7236,7 +7450,7 @@
 
       // Set initial master gain according to current mute state
       try {
-        const muted = !!(window.IronTideAudio && window.IronTideAudio.muted);
+        const muted = !!(window.GameAudio && window.GameAudio.muted);
         shipAudio.master.gain.value = muted ? 0 : 1;
       } catch {}
 
@@ -7314,9 +7528,9 @@
   };
   // Bridge into the existing global audio API if available
   try {
-    window.IronTideAudio = window.IronTideAudio || {};
-    window.IronTideAudio.setEngineOverlap = (sec) => shipAudio.setEngineOverlap(sec);
-    window.IronTideAudio.getEngineOverlap = () => shipAudio.getEngineOverlap();
+    window.GameAudio = window.GameAudio || {};
+    window.GameAudio.setEngineOverlap = (sec) => shipAudio.setEngineOverlap(sec);
+    window.GameAudio.getEngineOverlap = () => shipAudio.getEngineOverlap();
   } catch {}
   // Initialize audio on first user interaction per autoplay policies
   const __initAudioOnce = () => { initShipAudio(); window.removeEventListener('pointerdown', __initAudioOnce); window.removeEventListener('keydown', __initAudioOnce); };
@@ -7335,7 +7549,7 @@
   function updateShipAudio(dt, speedKts) {
     if (!shipAudio.inited || !shipAudio.ctx || !shipAudio.master) return;
     // Global mute integration
-    const muted = !!(window.IronTideAudio && window.IronTideAudio.muted);
+    const muted = !!(window.GameAudio && window.GameAudio.muted);
     const masterTarget = muted ? 0 : 1;
     const aM = volumeSlewFactor(dt);
     // Smooth master gain toward target
@@ -7420,8 +7634,8 @@
   // Helper: current selected formation name (lowercase) - now fleet-aware
   function getSelectedFormationName(fleetId){
     try { 
-      const fleet = fleetId || (window.IronTideSelectedFleet || 1);
-      const settings = window.IronTideFleetSettings && window.IronTideFleetSettings[fleet];
+      const fleet = fleetId || (window.SelectedFleet || 1);
+      const settings = window.FleetSettings && window.FleetSettings[fleet];
       if (settings && settings.formation) {
         return String(settings.formation).toLowerCase();
       }
@@ -7460,7 +7674,7 @@
   }
   // Helper: members of a fleet (ids as strings). Use stored order if available.
   function getFleetMembers(fleetId){
-    const fa = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+    const fa = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
     const ids = new Set();
     try {
       const set = fa[fleetId];
@@ -7468,7 +7682,7 @@
     } catch {}
     // Check if we have a custom order stored in fleet settings
     try {
-      const settings = window.IronTideFleetSettings && window.IronTideFleetSettings[fleetId];
+      const settings = window.FleetSettings && window.FleetSettings[fleetId];
       if (settings && Array.isArray(settings.shipOrder) && settings.shipOrder.length > 0) {
         // Filter to only IDs that are actually in the fleet
         const ordered = settings.shipOrder.filter(id => ids.has(String(id)));
@@ -7503,7 +7717,7 @@
       const order = [];
       if (leaderAlive) order.push(leaderId);
       for (const id of members) { if (id!==leaderId) order.push(id); }
-      const settings = (window.IronTideFleetSettings && window.IronTideFleetSettings[fleetId]) || {};
+      const settings = (window.FleetSettings && window.FleetSettings[fleetId]) || {};
       const fname = String(settings.formation||'Line Ahead').toLowerCase();
       if (order.length){ labels.set(order[0], 'center'); }
       if (fname.includes('double') && fname.includes('line') && fname.includes('ahead')){
@@ -7530,7 +7744,7 @@
   // Formation guidance for Echelon (diagonal / or \ formation)
   function updateFormationEchelon(dt, fleetId){
     try {
-      const selFleet = fleetId || (window.IronTideSelectedFleet || 1);
+      const selFleet = fleetId || (window.SelectedFleet || 1);
       const leaderId = getFleetLeaderId(selFleet); 
       if (!leaderId) return;
       const leader = getShipHandleById(leaderId); 
@@ -7540,7 +7754,7 @@
       const members = getFleetMembers(selFleet).map(id => getShipHandleById(id)).filter(h => !!(h && h.ship));
       if (!members.length) return;
       const followers = members.filter(h => h.id !== leaderId);
-      const fleetSettings = (window.IronTideFleetSettings && window.IronTideFleetSettings[selFleet]) || {};
+      const fleetSettings = (window.FleetSettings && window.FleetSettings[selFleet]) || {};
       const interval = Math.max(30, Number(fleetSettings.formationInterval) || Number(formationState.intervalMeters) || 180);
       const together = (fleetSettings.formationTurning === 'together') || (formationState.turning === 'together');
       const formUp = (fleetSettings.formationStation === 'formup') || (formationState.station === 'formup');
@@ -7553,7 +7767,7 @@
         const h = followers[i]; const s = h.ship; const st = h.state;
         console.log(`ECHELON: Processing follower ${i}, id=${h.id}`);
         if (!s || !st) { console.log(`ECHELON: No ship or state`); continue; }
-        const fa = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+        const fa = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
         const shipInThisFleet = fa[selFleet] && fa[selFleet].has(String(h.id));
         console.log(`ECHELON: shipInThisFleet=${shipInThisFleet} for ship ${h.id}`);
         if (!shipInThisFleet && !(selFleet === 1 && h.id === String((window.shipState && window.shipState.id) || '1'))) {
@@ -7652,7 +7866,7 @@
   // Formation guidance for Line Abreast (side by side perpendicular to leader heading)
   function updateFormationLineAbreast(dt, fleetId){
     try {
-      const selFleet = fleetId || (window.IronTideSelectedFleet || 1);
+      const selFleet = fleetId || (window.SelectedFleet || 1);
       const leaderId = getFleetLeaderId(selFleet); if (!leaderId) return;
       const leader = getShipHandleById(leaderId); if (!leader || !leader.ship) return;
       const ff = (window.FleetFormation[selFleet] = window.FleetFormation[selFleet] || { trail: [], lastRec:{x:0,y:0}, anchor:{} });
@@ -7660,7 +7874,7 @@
       const members = getFleetMembers(selFleet).map(id => getShipHandleById(id)).filter(h => !!(h && h.ship));
       if (!members.length) return;
       const followers = members.filter(h => h.id !== leaderId);
-      const fleetSettings = (window.IronTideFleetSettings && window.IronTideFleetSettings[selFleet]) || {};
+      const fleetSettings = (window.FleetSettings && window.FleetSettings[selFleet]) || {};
       const interval = Math.max(30, Number(fleetSettings.formationInterval) || Number(formationState.intervalMeters) || 180);
       const together = (fleetSettings.formationTurning === 'together') || (formationState.turning === 'together');
       const formUp = (fleetSettings.formationStation === 'formup') || (formationState.station === 'formup');
@@ -7670,7 +7884,7 @@
         const side = (i % 2 === 0) ? 'left' : 'right';
         const lateralDist = Math.ceil((rank+1)/2) * interval;
         const h = followers[i]; const s = h.ship; const st = h.state; if (!s || !st) continue;
-        const fa = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+        const fa = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
         const shipInThisFleet = fa[selFleet] && fa[selFleet].has(String(h.id));
         if (!shipInThisFleet && !(selFleet === 1 && h.id === String((window.shipState && window.shipState.id) || '1'))) continue;
         if (typeof st.speedKts !== 'number') st.speedKts = 10;
@@ -7779,7 +7993,7 @@
   // Formation guidance for Wedge (V shape /\ with adjustable angle)
   function updateFormationWedge(dt, fleetId){
     try {
-      const selFleet = fleetId || (window.IronTideSelectedFleet || 1);
+      const selFleet = fleetId || (window.SelectedFleet || 1);
       const leaderId = getFleetLeaderId(selFleet); 
       if (!leaderId) return;
       const leader = getShipHandleById(leaderId); 
@@ -7789,7 +8003,7 @@
       const members = getFleetMembers(selFleet).map(id => getShipHandleById(id)).filter(h => !!(h && h.ship));
       if (!members.length) return;
       const followers = members.filter(h => h.id !== leaderId);
-      const fleetSettings = (window.IronTideFleetSettings && window.IronTideFleetSettings[selFleet]) || {};
+      const fleetSettings = (window.FleetSettings && window.FleetSettings[selFleet]) || {};
       const interval = Math.max(30, Number(fleetSettings.formationInterval) || Number(formationState.intervalMeters) || 120);
       const together = (fleetSettings.formationTurning === 'together') || (formationState.turning === 'together');
       const formUp = (fleetSettings.formationStation === 'formup') || (formationState.station === 'formup');
@@ -7801,7 +8015,7 @@
         const side = (idx % 2 === 0) ? 'left' : 'right';
         const h = followers[i]; const s = h.ship; const st = h.state;
         if (!s || !st) continue;
-        const fa = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+        const fa = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
         const shipInThisFleet = fa[selFleet] && fa[selFleet].has(String(h.id));
         if (!shipInThisFleet && !(selFleet === 1 && h.id === String((window.shipState && window.shipState.id) || '1'))) {
           continue;
@@ -7895,7 +8109,7 @@
   // Helper: get which fleet a ship belongs to
   function getFleetIdForShip(shipId) {
     try {
-      const fleetAssignments = window.IronTideFleetAssignments || {};
+      const fleetAssignments = window.FleetAssignments || {};
       const shipIdStr = String(shipId);
       for (let fleetId = 1; fleetId <= 3; fleetId++) {
         if (fleetAssignments[fleetId] && fleetAssignments[fleetId].has(shipIdStr)) {
@@ -7972,7 +8186,7 @@
   // Formation guidance for Line Ahead
   function updateFormationLineAhead(dt, fleetId){
     try {
-      const selFleet = fleetId || (window.IronTideSelectedFleet || 1);
+      const selFleet = fleetId || (window.SelectedFleet || 1);
       const leaderId = getFleetLeaderId(selFleet); if (!leaderId) return;
       const leader = getShipHandleById(leaderId); if (!leader || !leader.ship) return;
       const ff = (window.FleetFormation[selFleet] = window.FleetFormation[selFleet] || { trail: [], lastRec:{x:0,y:0}, anchor:{} });
@@ -7986,7 +8200,7 @@
       // Compute followers (exclude leader)
       const followers = members.filter(h => h.id !== leaderId);
       // Get fleet-specific formation settings
-      const fleetSettings = (window.IronTideFleetSettings && window.IronTideFleetSettings[selFleet]) || {};
+      const fleetSettings = (window.FleetSettings && window.FleetSettings[selFleet]) || {};
       // Interval spacing
       const interval = Math.max(30, Number(fleetSettings.formationInterval) || Number(formationState.intervalMeters) || 180);
       const together = (fleetSettings.formationTurning === 'together') || (formationState.turning === 'together');
@@ -7998,7 +8212,7 @@
         const h = followers[i]; const s = h.ship; const st = h.state; if (!s || !st) continue;
         
         // Double-check this ship actually belongs to this fleet
-        const fa = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+        const fa = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
         const shipInThisFleet = fa[selFleet] && fa[selFleet].has(String(h.id));
         if (!shipInThisFleet && !(selFleet === 1 && h.id === String((window.shipState && window.shipState.id) || '1'))) {
           continue; // Skip ships not in this fleet
@@ -8096,7 +8310,7 @@
   // Formation guidance for Double Line Ahead - two parallel lines
   function updateFormationDoubleLineAhead(dt, fleetId){
     try {
-      const selFleet = fleetId || (window.IronTideSelectedFleet || 1);
+      const selFleet = fleetId || (window.SelectedFleet || 1);
       const leaderId = getFleetLeaderId(selFleet); if (!leaderId) return;
       const leader = getShipHandleById(leaderId); if (!leader || !leader.ship) return;
       const ff = (window.FleetFormation[selFleet] = window.FleetFormation[selFleet] || { trail: [], lastRec:{x:0,y:0}, anchor:{} });
@@ -8110,7 +8324,7 @@
       // Compute followers (exclude leader)
       const followers = members.filter(h => h.id !== leaderId);
       // Get fleet-specific formation settings
-      const fleetSettings = (window.IronTideFleetSettings && window.IronTideFleetSettings[selFleet]) || {};
+      const fleetSettings = (window.FleetSettings && window.FleetSettings[selFleet]) || {};
       // Interval spacing (along the line) and width (between the two lines)
       const interval = Math.max(30, Number(fleetSettings.formationInterval) || Number(formationState.intervalMeters) || 180);
       const width = Math.max(50, Number(fleetSettings.formationWidth) || 200);
@@ -8124,7 +8338,7 @@
         const h = followers[i]; const s = h.ship; const st = h.state; if (!s || !st) continue;
         
         // Double-check this ship actually belongs to this fleet
-        const fa = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+        const fa = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
         const shipInThisFleet = fa[selFleet] && fa[selFleet].has(String(h.id));
         if (!shipInThisFleet && !(selFleet === 1 && h.id === String((window.shipState && window.shipState.id) || '1'))) {
           continue; // Skip ships not in this fleet
@@ -8685,7 +8899,7 @@
   // Latched turn direction persists after key release until target heading is reached
   let latchedTurnDir = 0;
   function adjustSpeed(delta) {
-    const currentFleet = window.IronTideSelectedFleet || 1;
+    const currentFleet = window.SelectedFleet || 1;
     
     if (currentFleet === 1) {
       // Fleet 1: control player ship directly (original logic)
@@ -8705,7 +8919,7 @@
         fleetLeader.state.speedKts = newSpeed;
         
         // Update settings
-        const settings = window.IronTideFleetSettings[currentFleet];
+        const settings = window.FleetSettings[currentFleet];
         if (settings) {
           settings.speed = newSpeed;
         }
@@ -8809,7 +9023,7 @@
   if (speedSliderEl) {
     setSpeedFromSlider(speedSliderEl.value);
     speedSliderEl.addEventListener('input', (e)=>{
-      const currentFleet = window.IronTideSelectedFleet || 1;
+      const currentFleet = window.SelectedFleet || 1;
       
       // If Fleet 1 is selected, use the original player ship logic
       if (currentFleet === 1) {
@@ -8827,7 +9041,7 @@
         }
         
         // Update settings
-        const settings = window.IronTideFleetSettings[currentFleet];
+        const settings = window.FleetSettings[currentFleet];
         if (settings) {
           settings.speed = newSpeed;
         }
@@ -9219,7 +9433,7 @@
     } catch {}
     // Solution placement: allow for all fleets when armed
     try {
-      const currentFleet = window.IronTideSelectedFleet || 1;
+      const currentFleet = window.SelectedFleet || 1;
       let solutionArmed = false;
       
       if (currentFleet === 1) {
@@ -9357,7 +9571,7 @@
       ship.moveTarget = { x: w.x, y: w.y };
       
       // Immediately save to fleet patterns so it's visible
-      const currentFleet = window.IronTideSelectedFleet || 1;
+      const currentFleet = window.SelectedFleet || 1;
       if (window.FleetPatterns && window.FleetPatterns[currentFleet]) {
         window.FleetPatterns[currentFleet] = JSON.parse(JSON.stringify(patterns));
       }
@@ -9392,7 +9606,7 @@
       patterns.guiding = true;
       
       // Immediately save to fleet patterns so it's visible
-      const currentFleet = window.IronTideSelectedFleet || 1;
+      const currentFleet = window.SelectedFleet || 1;
       if (window.FleetPatterns && window.FleetPatterns[currentFleet]) {
         window.FleetPatterns[currentFleet] = JSON.parse(JSON.stringify(patterns));
       }
@@ -9432,7 +9646,7 @@
           patterns.guiding = true;
           
           // Immediately save to fleet patterns so it's visible
-          const currentFleet = window.IronTideSelectedFleet || 1;
+          const currentFleet = window.SelectedFleet || 1;
           if (window.FleetPatterns && window.FleetPatterns[currentFleet]) {
             window.FleetPatterns[currentFleet] = JSON.parse(JSON.stringify(patterns));
           }
@@ -9498,7 +9712,7 @@
         }
         
         // Immediately save to fleet patterns so it's visible
-        const currentFleet = window.IronTideSelectedFleet || 1;
+        const currentFleet = window.SelectedFleet || 1;
         if (window.FleetPatterns && window.FleetPatterns[currentFleet]) {
           window.FleetPatterns[currentFleet] = JSON.parse(JSON.stringify(patterns));
         }
@@ -9536,7 +9750,7 @@
       patterns.guiding = true;
       
       // Immediately save to fleet patterns so it's visible
-      const currentFleet = window.IronTideSelectedFleet || 1;
+      const currentFleet = window.SelectedFleet || 1;
       if (window.FleetPatterns && window.FleetPatterns[currentFleet]) {
         window.FleetPatterns[currentFleet] = JSON.parse(JSON.stringify(patterns));
       }
@@ -9577,7 +9791,7 @@
     
     // Check for fleet targeting modes
     if (window.fleet2TargetingMode) {
-      const fleetSettings = window.IronTideFleetSettings && window.IronTideFleetSettings[2];
+      const fleetSettings = window.FleetSettings && window.FleetSettings[2];
       if (fleetSettings) {
         fleetSettings.firingSolution = fleetSettings.firingSolution || {};
         fleetSettings.firingSolution.target = { x: w.x, y: w.y };
@@ -9593,7 +9807,7 @@
     }
     
     if (window.fleet3TargetingMode) {
-      const fleetSettings = window.IronTideFleetSettings && window.IronTideFleetSettings[3];
+      const fleetSettings = window.FleetSettings && window.FleetSettings[3];
       if (fleetSettings) {
         fleetSettings.firingSolution = fleetSettings.firingSolution || {};
         fleetSettings.firingSolution.target = { x: w.x, y: w.y };
@@ -9610,9 +9824,9 @@
     
     // If Gunnery is enabled and Solution is armed, do not treat canvas clicks as move commands
     if (!(gunnery && gunnery.enabled && window.gunnerySolutionArmed)) {
-      const sel = (window.IronTideSelectedFleet || 1);
-      window.IronTideFleetStates = window.IronTideFleetStates || {};
-      window.IronTideFleetStates[sel] = window.IronTideFleetStates[sel] || { desiredHeading: 0, speedKts: 0, moveTarget: null };
+      const sel = (window.SelectedFleet || 1);
+      window.FleetStates = window.FleetStates || {};
+      window.FleetStates[sel] = window.FleetStates[sel] || { desiredHeading: 0, speedKts: 0, moveTarget: null };
       
       if (sel === 1) {
         // Fleet 1: If no active pattern guidance, set a fixed desired heading and clear moveTarget
@@ -9634,9 +9848,9 @@
             }
           } catch {}
           // Persist to fleet state for UI
-          try { window.IronTideFleetStates[1].desiredHeading = heading; } catch {}
+          try { window.FleetStates[1].desiredHeading = heading; } catch {}
           // Engage manual heading hold so the ship will turn in place toward desired heading
-          try { window.IronTideManualHeadingHold = window.IronTideManualHeadingHold || { 1:false,2:false,3:false }; window.IronTideManualHeadingHold[1] = true; } catch {}
+          try { window.ManualHeadingHold = window.ManualHeadingHold || { 1:false,2:false,3:false }; window.ManualHeadingHold[1] = true; } catch {}
           // Mirror to fleet leader state for consistency with compass behavior
           try {
             const leader = getFleetLeader(1);
@@ -9654,7 +9868,7 @@
         }
       } else {
         // Fleet 2/3: Set move target and heading for fleet leader
-        window.IronTideFleetStates[sel].moveTarget = { x: w.x, y: w.y };
+        window.FleetStates[sel].moveTarget = { x: w.x, y: w.y };
         
         const fleetLeader = getFleetLeader(sel);
         if (fleetLeader && fleetLeader.state && fleetLeader.state.ship) {
@@ -9773,7 +9987,7 @@
     } else {
       // Check for fleet targeting pin removal first
       const w = screenToWorld(p.x, p.y);
-      const currentFleet = window.IronTideSelectedFleet || 1;
+      const currentFleet = window.SelectedFleet || 1;
       let removedPin = false;
       
       // Check if near any fleet's targeting pin
@@ -10216,7 +10430,7 @@
       const vf = window.viewFollow || { enabled: false, mode: 'player', fleetId: 1 };
       if (vf.enabled) {
         if (vf.mode === 'fleet') {
-          const fid = vf.fleetId || (window.IronTideSelectedFleet || 1);
+          const fid = vf.fleetId || (window.SelectedFleet || 1);
           const leader = getFleetLeader ? getFleetLeader(fid) : null;
           if (leader && leader.state && leader.state.ship) {
             camera.cx = leader.state.ship.x;
@@ -10349,7 +10563,7 @@
   
   // Helper function to get the current fleet's pattern object
   function getFleetPatterns(fleetId) {
-    const fleet = fleetId || (window.IronTideSelectedFleet || 1);
+    const fleet = fleetId || (window.SelectedFleet || 1);
     if (!window.FleetPatterns[fleet]) {
       window.FleetPatterns[fleet] = JSON.parse(JSON.stringify(patterns));
     }
@@ -10380,8 +10594,8 @@
       fp.circleDraggingIndex = -1;
       // Persist in settings UI state
       try {
-        if (window.IronTideFleetSettings && window.IronTideFleetSettings[fleetId]) {
-          window.IronTideFleetSettings[fleetId].pattern = '';
+        if (window.FleetSettings && window.FleetSettings[fleetId]) {
+          window.FleetSettings[fleetId].pattern = '';
         }
       } catch {}
       // If the currently selected fleet matches, do not disturb other fleets' UI
@@ -10394,7 +10608,7 @@
   try { window.clearFleetPattern = clearFleetPattern; } catch {}
   
   function clearPattern(fleetId) {
-    const fleet = fleetId || (window.IronTideSelectedFleet || 1);
+    const fleet = fleetId || (window.SelectedFleet || 1);
     const fleetPatterns = getFleetPatterns(fleet);
     
     fleetPatterns.selected = null;
@@ -10419,7 +10633,7 @@
     if (patternSelEl) patternSelEl.classList.remove('pattern-placing');
     
     // Also clear global patterns for backward compatibility with current fleet
-    if (fleet === (window.IronTideSelectedFleet || 1)) {
+    if (fleet === (window.SelectedFleet || 1)) {
       patterns.selected = null;
       patterns.placingPin = false;
       patterns.pin = null;
@@ -10521,7 +10735,7 @@
   }
   function drawPatternOverlaysWorld() {
     // Draw planned path polylines for ALL fleets so you can see where all ships are going
-    const currentFleet = window.IronTideSelectedFleet || 1;
+    const currentFleet = window.SelectedFleet || 1;
     
     // Draw patterns for all fleets
     for (let fleetId = 1; fleetId <= 3; fleetId++) {
@@ -10811,7 +11025,7 @@
     const desiredChangeRate = 60; // deg/sec for commanded change
     
     // Fleet-aware keyboard controls
-    const currentFleet = window.IronTideSelectedFleet || 1;
+    const currentFleet = window.SelectedFleet || 1;
     const fleetLeader = getFleetLeader(currentFleet);
     
     if (currentFleet === 1) {
@@ -10990,7 +11204,7 @@
     // Fleet 1 manual heading hold: scale linearly 0..30 kts (0 => no turn, 30+ => full)
     let effRudder = rudderEffectiveness(Math.abs(actualSpeedKts)) * (effects.rudderEffectivenessScale || 1);
     try {
-      const hold = !!(window.IronTideManualHeadingHold && window.IronTideManualHeadingHold[1]);
+      const hold = !!(window.ManualHeadingHold && window.ManualHeadingHold[1]);
       const fp1 = (window.FleetPatterns && window.FleetPatterns[1]) || null;
       const patternActive1 = !!(fp1 && fp1.selected && fp1.path && fp1.path.length > 1 && fp1.guiding !== false);
       if (hold && !patternActive1) {
@@ -11109,7 +11323,7 @@
               // Validate player as a target (alive, present in fleet, not despawned)
               const pid = (window.shipState && window.shipState.id != null) ? String(window.shipState.id) : '1';
               const palive = !!(window.shipState && !(window.shipState.effects?.sunk || window.shipState.sunk));
-              const fa = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+              const fa = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
               // Check if player is in ANY fleet, not just Fleet 1
               const inFleet = !!(
                 (fa[1] instanceof Set && fa[1].has(pid)) ||
@@ -11184,7 +11398,7 @@
           // Validate player target for auto-aim
           const pid = (window.shipState && window.shipState.id != null) ? String(window.shipState.id) : '1';
           const palive = !!(window.shipState && !(window.shipState.effects?.sunk || window.shipState.sunk));
-          const fa = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+          const fa = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
           // Check if player is in ANY fleet, not just Fleet 1
           const inFleet = !!(
             (fa[1] instanceof Set && fa[1].has(pid)) ||
@@ -11220,7 +11434,7 @@
       if (Array.isArray(window.NPCs)) {
         // Per-NPC gunnery state map
         window.NpcGunsById = window.NpcGunsById || {};
-        const fleetA = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+        const fleetA = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
         const enemySet = window.EnemyFleet1 instanceof Set ? window.EnemyFleet1 : new Set();
         const playerHasPin = !!(firingSolution && firingSolution.target);
         // Helper: resolve a world point to an enemy NPC center if the point lies over it; otherwise null
@@ -11272,7 +11486,7 @@
           if (isFriendlyFleet1) {
             fleetId = 1;
             // Fleet 1 only fires if Fleet 1 is selected AND gunnery is enabled
-            const selectedFleet = window.IronTideSelectedFleet || 1;
+            const selectedFleet = window.SelectedFleet || 1;
             const playerFiring = selectedFleet === 1 && (
               !!(typeof gunneryFire === 'object' && gunneryFire && gunneryFire.enabled)
               || (!!(firingSolution && firingSolution.target) && !(solutionCalc && solutionCalc.active))
@@ -11281,12 +11495,12 @@
             fleetTarget = firingSolution && firingSolution.target;
           } else if (isFriendlyFleet2) {
             fleetId = 2;
-            const fleetSettings = window.IronTideFleetSettings && window.IronTideFleetSettings[2];
+            const fleetSettings = window.FleetSettings && window.FleetSettings[2];
             fleetFiring = fleetSettings && fleetSettings.fireEnabled;
             fleetTarget = fleetSettings && fleetSettings.firingSolution && fleetSettings.firingSolution.target;
           } else if (isFriendlyFleet3) {
             fleetId = 3;
-            const fleetSettings = window.IronTideFleetSettings && window.IronTideFleetSettings[3];
+            const fleetSettings = window.FleetSettings && window.FleetSettings[3];
             fleetFiring = fleetSettings && fleetSettings.fireEnabled;
             fleetTarget = fleetSettings && fleetSettings.firingSolution && fleetSettings.firingSolution.target;
           }
@@ -11321,7 +11535,7 @@
                 const pid = (window.shipState && window.shipState.id != null) ? String(window.shipState.id) : '1';
                 if (currentTargetId === pid) {
                   const palive = !!(window.shipState && !(window.shipState.effects?.sunk || window.shipState.sunk));
-                  const fa = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+                  const fa = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
                   // Check if player is in ANY fleet, not just Fleet 1
                   const inFleet = !!(
                     (fa[1] instanceof Set && fa[1].has(pid)) ||
@@ -11356,7 +11570,7 @@
                 const palive = !!(window.shipState && !(window.shipState.effects?.sunk || window.shipState.sunk));
                 const pIsEnemy = enemySet2.has(pid);
                 // Also require player to be present in FleetAssignments (not despawned) and not explicitly flagged as despawned
-                const fa = window.IronTideFleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
+                const fa = window.FleetAssignments || { 1: new Set(), 2: new Set(), 3: new Set() };
                 // Check if player is in ANY fleet, not just Fleet 1
                 const inFleet = !!(
                   (fa[1] instanceof Set && fa[1].has(pid)) ||
@@ -11551,7 +11765,7 @@
           // Determine fleet id for this friendly ship
           let fid = 1;
           try {
-            const A = window.IronTideFleetAssignments || {};
+            const A = window.FleetAssignments || {};
             const idNumNpc = npc && npc.state && npc.state.id != null ? Number(npc.state.id) : NaN;
             const inSet = (s) => !!(s && (s.has(idStr) || (!Number.isNaN(idNumNpc) && s.has(idNumNpc))));
             if (A[2] instanceof Set && inSet(A[2])) fid = 2;
@@ -11897,7 +12111,7 @@
     // Fleet 2/3 Leader Turret Control and Firing
     for (let fleetId = 2; fleetId <= 3; fleetId++) {
       const fleetLeader = getFleetLeader(fleetId);
-      const fleetSettings = window.IronTideFleetSettings[fleetId];
+      const fleetSettings = window.FleetSettings[fleetId];
       
       if (fleetLeader && fleetLeader.state && fleetSettings && fleetSettings.firingSolution && fleetSettings.firingSolution.target) {
         const leaderState = fleetLeader.state;
@@ -12009,7 +12223,7 @@
       function alreadyHandled(id){ try { return id != null && window.__SunkIds.has(String(id)); } catch { return false; } }
       function removeFromFleets(idStr){
         try {
-          const fa = window.IronTideFleetAssignments;
+          const fa = window.FleetAssignments;
           if (fa) { [1,2,3].forEach(k=>{ if (fa[k] instanceof Set) fa[k].delete(idStr); }); }
         } catch {}
         try { if (window.EnemyFleet1 instanceof Set) window.EnemyFleet1.delete(idStr); } catch {}
@@ -12031,7 +12245,7 @@
           // Clear target from all fleets if they were targeting this player
           try {
             for (let fleetId = 1; fleetId <= 3; fleetId++) {
-              const fleetSettings = window.IronTideFleetSettings[fleetId];
+              const fleetSettings = window.FleetSettings[fleetId];
               if (fleetSettings && fleetSettings.firingSolution && fleetSettings.firingSolution.targetId && String(fleetSettings.firingSolution.targetId) === pid) {
                 fleetSettings.firingSolution.target = null;
                 fleetSettings.firingSolution.targetId = null;
@@ -12075,7 +12289,7 @@
             // Clear target from all fleets if they were targeting this ship
             try {
               for (let fleetId = 1; fleetId <= 3; fleetId++) {
-                const fleetSettings = window.IronTideFleetSettings[fleetId];
+                const fleetSettings = window.FleetSettings[fleetId];
                 if (fleetSettings && fleetSettings.firingSolution && fleetSettings.firingSolution.targetId && String(fleetSettings.firingSolution.targetId) === idStr) {
                   fleetSettings.firingSolution.target = null;
                   fleetSettings.firingSolution.targetId = null;
@@ -12112,7 +12326,7 @@
               // Clear target from all fleets if they were targeting this ship
               try {
                 for (let fleetId = 1; fleetId <= 3; fleetId++) {
-                  const fleetSettings = window.IronTideFleetSettings[fleetId];
+                  const fleetSettings = window.FleetSettings[fleetId];
                   if (fleetSettings && fleetSettings.firingSolution && fleetSettings.firingSolution.targetId && String(fleetSettings.firingSolution.targetId) === idStr) {
                     fleetSettings.firingSolution.target = null;
                     fleetSettings.firingSolution.targetId = null;
@@ -12274,8 +12488,8 @@
               }
               
               // Only check click-to-move if not following a pattern
-              if (!patternGuided && window.IronTideFleetStates && window.IronTideFleetStates[fleetId] && window.IronTideFleetStates[fleetId].moveTarget) {
-                const moveTarget = window.IronTideFleetStates[fleetId].moveTarget;
+              if (!patternGuided && window.FleetStates && window.FleetStates[fleetId] && window.FleetStates[fleetId].moveTarget) {
+                const moveTarget = window.FleetStates[fleetId].moveTarget;
                 const dx = moveTarget.x - ship.x;
                 const dy = moveTarget.y - ship.y;
                 const dist = Math.hypot(dx, dy);
@@ -12283,7 +12497,7 @@
                 
                 if (dist < arriveTol) {
                   // Arrived at target
-                  window.IronTideFleetStates[fleetId].moveTarget = null;
+                  window.FleetStates[fleetId].moveTarget = null;
                 } else {
                   // Steer toward the target and move forward
                   const desired = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
@@ -12297,7 +12511,7 @@
           
           // Pattern following for ALL Fleet 1 ships (including non-leaders)
           const shipId = String(state.id);
-          const fa = window.IronTideFleetAssignments || {};
+          const fa = window.FleetAssignments || {};
           const isFleet1Ship = fa[1] && fa[1].has(shipId);
           
           // Use Fleet 1's specific patterns only (never fall back to global 'patterns')
@@ -12391,7 +12605,7 @@
           
           // Pattern following for ALL Fleet 2 and 3 ships (including non-leaders)
           for (let fleetId = 2; fleetId <= 3; fleetId++) {
-            const fa = window.IronTideFleetAssignments || {};
+            const fa = window.FleetAssignments || {};
             const isFleetShip = fa[fleetId] && fa[fleetId].has(shipId);
             
             if (isFleetShip) {
@@ -12546,22 +12760,27 @@
     
     // Formation guidance - apply to each fleet independently
     try {
-      for (let fleetId = 1; fleetId <= 3; fleetId++) {
-        // Only apply formation if fleet has ships
-        const fleetMembers = getFleetMembers(fleetId);
-        if (!fleetMembers || fleetMembers.length === 0) continue;
-        
-        const fname = getSelectedFormationName(fleetId) || '';
-        const lname = String(fname).toLowerCase();
-        if (window.VerboseLogs) console.log(`Fleet ${fleetId}: formation='${fname}', members=${fleetMembers.length}`);
-        if (lname.includes('double') && lname.includes('line') && lname.includes('ahead')) {
-          updateFormationDoubleLineAhead(dt, fleetId);
-        } else if (lname.includes('line') && lname.includes('ahead')) {
-          updateFormationLineAhead(dt, fleetId);
-        } else if (lname.includes('echelon')) {
-          updateFormationEchelon(dt, fleetId);
-        } else if (lname.includes('wedge')) {
-          updateFormationWedge(dt, fleetId);
+      // Skip formations if disabled for debugging
+      if (window.__FORMATIONS_DISABLED__) {
+        if (window.VerboseLogs) console.log('[DEBUG] Formations disabled, skipping formation updates');
+      } else {
+        for (let fleetId = 1; fleetId <= 3; fleetId++) {
+          // Only apply formation if fleet has ships
+          const fleetMembers = getFleetMembers(fleetId);
+          if (!fleetMembers || fleetMembers.length === 0) continue;
+          
+          const fname = getSelectedFormationName(fleetId) || '';
+          const lname = String(fname).toLowerCase();
+          if (window.VerboseLogs) console.log(`Fleet ${fleetId}: formation='${fname}', members=${fleetMembers.length}`);
+          if (lname.includes('double') && lname.includes('line') && lname.includes('ahead')) {
+            updateFormationDoubleLineAhead(dt, fleetId);
+          } else if (lname.includes('line') && lname.includes('ahead')) {
+            updateFormationLineAhead(dt, fleetId);
+          } else if (lname.includes('echelon')) {
+            updateFormationEchelon(dt, fleetId);
+          } else if (lname.includes('wedge')) {
+            updateFormationWedge(dt, fleetId);
+          }
         }
       }
     } catch {}
@@ -12925,7 +13144,7 @@
         dragging = true;
         const d = pointerAngleDeg(e, elem);
         if (type==='fleet') {
-          const sel = (window.IronTideSelectedFleet || 1);
+          const sel = (window.SelectedFleet || 1);
           // Apply heading to the selected fleet's leader (works for fleets 1-3)
           try {
             const leader = (typeof getFleetLeader === 'function') ? getFleetLeader(sel) : null;
@@ -12945,7 +13164,7 @@
         if (!dragging) return;
         const d = pointerAngleDeg(e, elem);
         if (type==='fleet') {
-          const sel = (window.IronTideSelectedFleet || 1);
+          const sel = (window.SelectedFleet || 1);
           try {
             const leader = (typeof getFleetLeader === 'function') ? getFleetLeader(sel) : null;
             if (!leader || !leader.state) return;
@@ -13032,8 +13251,8 @@
     updateCamera();
     // Update compass needles every frame for real-time feedback
     try { 
-      const currentFleet = window.IronTideSelectedFleet || 1;
-      const settings = window.IronTideFleetSettings && window.IronTideFleetSettings[currentFleet];
+      const currentFleet = window.SelectedFleet || 1;
+      const settings = window.FleetSettings && window.FleetSettings[currentFleet];
       if (settings) updateCompassNeedles(settings);
     } catch {}
     // Drive solution calc progress UI
@@ -13081,7 +13300,7 @@
     drawZoomOutSlider();
 
     // Sync DOM compass needles and speed UI according to selected fleet
-    const selFleet = (window.IronTideSelectedFleet || 1);
+    const selFleet = (window.SelectedFleet || 1);
     const fcPlanned = document.querySelector('#fleetCompass .needle.planned');
     const fcActual  = document.querySelector('#fleetCompass .needle.actual');
     // Get turret compass for current fleet
@@ -13210,11 +13429,11 @@ rafHandle = requestAnimationFrame(gameLoop);
       try { window.ShipHandlesById = window.ShipHandlesById || {}; Object.keys(window.ShipHandlesById).forEach(k=>{ if (!keepIds.has(k) && !keepIds.has(Number(k))) delete window.ShipHandlesById[k]; }); } catch {}
       try { window.EnemyFleet1 = new Set(); } catch {}
       try {
-        window.IronTideFleetAssignments = { 1: new Set(), 2: new Set(), 3: new Set() };
+        window.FleetAssignments = { 1: new Set(), 2: new Set(), 3: new Set() };
         // Ensure player ID 1 is in Fleet 1; do NOT assign 50 to any friendly fleet
-        window.IronTideFleetAssignments[1].add('1');
+        window.FleetAssignments[1].add('1');
         // explicitly ensure 50 is not present
-        ['1','2','3'].forEach(fid=>{ try { window.IronTideFleetAssignments[fid].delete('50'); } catch {} });
+        ['1','2','3'].forEach(fid=>{ try { window.FleetAssignments[fid].delete('50'); } catch {} });
       } catch {}
       // Also reset legacy fleet maps (fa, fleetAssignments)
       try {
@@ -13759,7 +13978,15 @@ rafHandle = requestAnimationFrame(gameLoop);
                     console.log('Current NPCs before spawn:', window.NPCs?.length || 0, 'ships');
                     
                     const transportNpc = window.spawnTransport(opts.side, wx, wy, opts);
+                    if (!transportNpc) {
+                      console.error('ERROR: spawnTransport returned null/undefined!');
+                      throw new Error('Transport spawn failed');
+                    }
                     const st = transportNpc.state;
+                    if (!st) {
+                      console.error('ERROR: transportNpc.state is null/undefined!', transportNpc);
+                      throw new Error('Transport state missing');
+                    }
                     
                     console.log('=== TRANSPORT CREATED ===');
                     console.log('Transport NPC:', transportNpc);
@@ -14088,7 +14315,15 @@ rafHandle = requestAnimationFrame(gameLoop);
                   } else if (opts.shipKind === 'prinzeugen' && typeof window.spawnPrinzEugen === 'function') {
                     console.log('=== PRINZ EUGEN SPAWN DEBUG START ===');
                     const pe = window.spawnPrinzEugen(opts.side, wx, wy, opts);
+                    if (!pe) {
+                      console.error('ERROR: spawnPrinzEugen returned null/undefined!');
+                      throw new Error('Prinz Eugen spawn failed');
+                    }
                     const st = pe && pe.state;
+                    if (!st) {
+                      console.error('ERROR: pe.state is null/undefined!', pe);
+                      throw new Error('Prinz Eugen state missing');
+                    }
                     if (st && st.ship) {
                       // Ensure exact placement and initial state
                       st.ship.x = wx; st.ship.y = wy;
@@ -14101,7 +14336,11 @@ rafHandle = requestAnimationFrame(gameLoop);
                   } else if (typeof window.spawnNpcAt === 'function') {
                     created = window.spawnNpcAt(wx, wy, opts);
                   }
-                } catch {}
+                } catch (err) {
+                  console.error('[PLACE-SHIP] Ship spawn failed with error:', err);
+                  console.error('[PLACE-SHIP] Error stack:', err.stack);
+                  console.error('[PLACE-SHIP] Attempted to spawn:', opts.shipKind, 'on side:', opts.side);
+                }
                 // Optional despawn timer
                 try {
                   const sec = Number(window.DebugPlaceMode.despawnSec) || 0;
@@ -14211,8 +14450,8 @@ rafHandle = requestAnimationFrame(gameLoop);
         formationState.echelonDir = leftOn ? 'left' : 'right';
         // Save to fleet settings
         try {
-          const currentFleet = window.IronTideSelectedFleet || 1;
-          const settings = window.IronTideFleetSettings && window.IronTideFleetSettings[currentFleet];
+          const currentFleet = window.SelectedFleet || 1;
+          const settings = window.FleetSettings && window.FleetSettings[currentFleet];
           if (settings) {
             settings.echelonDirection = leftOn ? 'left' : 'right';
           }
@@ -14388,7 +14627,7 @@ rafHandle = requestAnimationFrame(gameLoop);
         const val = String(e.target.value || '').toLowerCase();
         // Fleet-specific remove pattern
         if (val === 'remove') {
-          const currentFleet = window.IronTideSelectedFleet || 1;
+          const currentFleet = window.SelectedFleet || 1;
           // Clear only this fleet's saved pattern state
           clearFleetPattern(currentFleet);
           // Reset the working UI pattern object for the active fleet
@@ -14506,7 +14745,7 @@ rafHandle = requestAnimationFrame(gameLoop);
         }
         // Sync loop and direction to fleet-specific patterns so followers use it
         try {
-          const currentFleet = window.IronTideSelectedFleet || 1;
+          const currentFleet = window.SelectedFleet || 1;
           if (window.FleetPatterns && window.FleetPatterns[currentFleet]) {
             window.FleetPatterns[currentFleet].loop = !!on;
             // Initialize zigForward if missing
@@ -14531,7 +14770,7 @@ rafHandle = requestAnimationFrame(gameLoop);
         }
         
         // Clear the current fleet's zigzag pattern
-        const currentFleet = window.IronTideSelectedFleet || 1;
+        const currentFleet = window.SelectedFleet || 1;
         const fleetPatterns = getFleetPatterns(currentFleet);
         
         fleetPatterns.loop = false;
@@ -14542,7 +14781,7 @@ rafHandle = requestAnimationFrame(gameLoop);
           fleetPatterns.placingPin = true;
           
           // Also update global patterns for current fleet
-          if (currentFleet === (window.IronTideSelectedFleet || 1)) {
+          if (currentFleet === (window.SelectedFleet || 1)) {
             patterns.loop = false;
             patterns.selected = 'zigzag';
             patterns.placingPin = true;
@@ -14564,7 +14803,7 @@ rafHandle = requestAnimationFrame(gameLoop);
         }
         // Sync to current fleet's persisted patterns
         try {
-          const currentFleet = window.IronTideSelectedFleet || 1;
+          const currentFleet = window.SelectedFleet || 1;
           if (window.FleetPatterns && window.FleetPatterns[currentFleet]) {
             window.FleetPatterns[currentFleet].circleCw = !!cw;
           }
@@ -14610,7 +14849,7 @@ rafHandle = requestAnimationFrame(gameLoop);
       });
       if (circleResetBtn) circleResetBtn.addEventListener('click', ()=>{
         // Clear the current fleet's circle pattern and re-enter placement
-        const currentFleet = window.IronTideSelectedFleet || 1;
+        const currentFleet = window.SelectedFleet || 1;
         const fleetPatterns = getFleetPatterns(currentFleet);
         
         if (fleetPatterns.selected === 'circle' || fleetPatterns.pendingSelection === 'circle') {
@@ -14620,7 +14859,7 @@ rafHandle = requestAnimationFrame(gameLoop);
           fleetPatterns.placingPin = true;
           
           // Also update global patterns for current fleet
-          if (currentFleet === (window.IronTideSelectedFleet || 1)) {
+          if (currentFleet === (window.SelectedFleet || 1)) {
             patterns.selected = 'circle';
             patterns.pendingSelection = 'circle';
             patterns.placingPin = true;
@@ -14643,7 +14882,7 @@ rafHandle = requestAnimationFrame(gameLoop);
           patterns.loop = on;
           // Sync to current fleet patterns
           try {
-            const currentFleet = window.IronTideSelectedFleet || 1;
+            const currentFleet = window.SelectedFleet || 1;
             if (window.FleetPatterns && window.FleetPatterns[currentFleet]) {
               window.FleetPatterns[currentFleet].freeDrawLoop = !!on;
               window.FleetPatterns[currentFleet].loop = !!on;
@@ -14651,7 +14890,7 @@ rafHandle = requestAnimationFrame(gameLoop);
           } catch {}
         });
         if (freeDrawResetBtn) freeDrawResetBtn.addEventListener('click', ()=>{
-          const currentFleet = window.IronTideSelectedFleet || 1;
+          const currentFleet = window.SelectedFleet || 1;
           const fleetPatterns = getFleetPatterns(currentFleet);
           // Clear the current Free Draw pattern and re-enter placement mode
           clearPattern(currentFleet);

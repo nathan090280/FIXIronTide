@@ -1,3 +1,19 @@
+// List all ships across all registries
+listAllShips()
+
+// Toggle formations on/off to isolate issues
+toggleFormations(false)  // Disable formations
+toggleFormations(true)   // Enable formations
+toggleFormations()       // Toggle current state
+
+// Toggle HUDs on/off to isolate issues
+toggleHUDs(false)  // Hide all HUDs
+toggleHUDs(true)   // Show all HUDs
+toggleHUDs()       // Toggle current state
+
+// Force cleanup of any lingering sunk ships
+cleanupSunkShips()
+
 line 531
 engOverlapSec:
 

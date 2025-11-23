@@ -188,10 +188,10 @@
       shipState.id = 1;
       if (!shipState.displayName) shipState.displayName = `Friendly Battleship 1`;
       // Initialize next-id counter to 1 to avoid collisions; enemy IDs will be handled separately
-      global.IronTideFleetNextId = 1;
-      global.IronTideFleet = global.IronTideFleet || [];
+      global.NextShipId = 1;
+      global.Fleet1 = global.Fleet1 || [];
       const __bmHandle = { state: shipState, profile };
-      global.IronTideFleet.push(__bmHandle);
+      global.Fleet1.push(__bmHandle);
       // Register into global ShipPool and ShipHandlesById for unified lookups
       try {
         global.ShipPool = global.ShipPool || { friendly: { All: [], Battleship: [], Transport: [] }, enemy: { All: [], Battleship: [], Transport: [] } };
@@ -310,7 +310,7 @@
         }
       } catch {}
       // Expose globally
-      global.IronTideAudio = audio;
+      global.GameAudio = audio;
     } catch {}
   })();
 
